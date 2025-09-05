@@ -1,0 +1,15 @@
+# render.yaml — Render.com blueprint
+services:
+  - type: web
+    name: baloot-server
+    env: python
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    autoDeploy: true
+    # Render will do HTTP health checks; we answer 200 OK at /healthz in server.py
+    healthCheckPath: /healthz
+    numInstances: 1
+    # Allow WebSocket upgrades (default enabled on web services)
+    # envVars: []  # Add if you need custom env vars

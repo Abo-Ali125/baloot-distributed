@@ -29,8 +29,7 @@ seat = room.seat_of(req.player_id)
 if seat is None:
 raise HTTPException(403, "NOT_IN_ROOM")
 try:
-await room.on_play_card(seat, Card(suit=req.suit, rank=req.rank), req.action_id)                                                                                                                                                                                                                          #------------------HHH#
-except ValueError as e:
+await room.on_play_card(seat, Card(suit=req.suit, rank=req.rank), req.action_id)                                                                                                                                                                                   
 # domain errors map to HTTP 400 with code in message
 raise HTTPException(400, str(e))
 # announce updates

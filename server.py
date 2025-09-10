@@ -3,13 +3,11 @@ if room is None:
 room = GameRoom(room_id=req.room_id)
 ROOMS[req.room_id] = room
 
-
 player_id = req.player_id or str(uuid.uuid4())
 seat_index = room.join(player_id=player_id, name=req.name)
 await q(player_id).put({"type": "room_state", "room": room.snapshot(player_id)})
 await broadcast(room, {"type": "presence", "seats": room.seat_summary()})
 return {"player_id": player_id, "seat": seat_index, "room": room.snapshot(player_id)}
-
 
 @app.post("/ready")
 async def ready(req: ReadyReq):
@@ -22,8 +20,6 @@ raise HTTPException(403, "NOT_IN_ROOM")
 await room.on_ready(seat)
 await broadcast(room, {"type": "room_state", "room": room.snapshot(req.player_id)})
 return {"ok": True}
-
-
 @app.post("/play")
 async def play(req: PlayReq):
 room = ROOMS.get(req.room_id)
@@ -32,19 +28,13 @@ raise HTTPException(404, "ROOM_NOT_FOUND")
 seat = room.seat_of(req.player_id)
 if seat is None:
 raise HTTPException(403, "NOT_IN_ROOM")
-
-
 try:
-await room.on_play_card(seat, Card(suit=req.suit, rank=req.rank), req.action_id)
+await room.on_play_card(seat, Card(suit=req.suit, rank=req.rank), req.action_id)                                                                                                                                                                                                                          #------------------HHH#
 except ValueError as e:
 # domain errors map to HTTP 400 with code in message
 raise HTTPException(400, str(e))
-
-
 # announce updates
 await broadcast(room, {"type": "turn_update", "room": room.public_snapshot()})
-
-
 # if trick finished, announce result
 if room._just_finished_trick:
 await broadcast(room, {

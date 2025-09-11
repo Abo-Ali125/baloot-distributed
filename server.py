@@ -57,6 +57,12 @@ def broadcast_event(room_id, event_type, data):
         events_queue[room_id].append(event)
         logger.info(f"Broadcasting {event_type} to room {room_id}")
 
+@app.route('/', methods=['GET', 'HEAD'])
+def root():
+    """Root route for health checks and browser visits"""
+    # Return same payload as /health so Render's root checks get 200
+    return jsonify({'status': 'healthy', 'rooms': len(rooms)}), 200
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint for Render"""

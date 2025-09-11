@@ -6,7 +6,8 @@ import json
 import uuid
 import time
 import logging
-from flask import Flask, request, jsonify
+import os
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from threading import Lock
 from collections import deque
@@ -15,7 +16,8 @@ from datetime import datetime, timedelta
 from game import Game
 from models import Player, Room, GameState
 
-app = Flask(__name__)
+# Serve static files from ./static (so visiting / serves the UI if index.html exists)
+app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
 # Configure logging
@@ -59,8 +61,12 @@ def broadcast_event(room_id, event_type, data):
 
 @app.route('/', methods=['GET', 'HEAD'])
 def root():
-    """Root route for health checks and browser visits"""
-    # Return same payload as /health so Render's root checks get 200
+    """Serve the frontend HTML if present; otherwise return JSON health."""
+    index_path = os.path.join(app.static_folder or '', 'index.html')
+    if index_path and os.path.exists(index_path):
+        # Serve the static index.html (so visiting the Render URL shows the UI)
+        return send_from_directory(app.static_folder, 'index.html')
+    # Fallback: keep returning the JSON health payload (keeps health check behavior)
     return jsonify({'status': 'healthy', 'rooms': len(rooms)}), 200
 
 @app.route('/health', methods=['GET'])

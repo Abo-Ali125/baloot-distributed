@@ -1,6 +1,8 @@
 fastapi==0.115.0
 uvicorn==0.30.6
-
+Flask
+Flask-CORS
+gunicorn
 Flask==2.3.3
 Flask-CORS==4.0.0
 Werkzeug==2.3.7

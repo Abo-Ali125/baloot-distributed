@@ -6,6 +6,7 @@ import json
 import uuid
 import time
 import logging
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from threading import Lock
@@ -18,7 +19,7 @@ from models import Player, Room, GameState
 app = Flask(__name__)
 CORS(app)
 
-# Configure logging
+# Configure 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

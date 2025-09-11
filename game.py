@@ -1,251 +1,141 @@
-"""
-Baloot Game Logic
-Implements San-only rules for MVP
-"""
 import random
-import logging
-from typing import List, Tuple, Dict, Optional
+from typing import Dict, List, Tuple, Optional
 
-logger = logging.getLogger(__name__)
+# Simple Baloot-like game engine (lightweight)
+# - 32-card deck: ranks 7,8,9,10,J,Q,K,A and suits H,D,S,C
+# - 8 cards per player (4 players)
+# - Trick resolution: follow lead suit, highest rank wins (no trump mechanic implemented)
+# - Basic point values for scoring (10/A high value), accumulates team scores
+
+RANKS = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+SUITS = ['H', 'D', 'S', 'C']
+
+# Points mapping (simple approximation)
+POINTS = {
+    '7': 0,
+    '8': 0,
+    '9': 0,
+    '10': 10,
+    'J': 2,
+    'Q': 3,
+    'K': 4,
+    'A': 11
+}
 
 class Game:
-    """Core game logic for Baloot (San rules only)"""
-    
-    # Card values for San scoring
-    CARD_VALUES = {
-        '7': 0, '8': 0, '9': 0,
-        'J': 2, 'Q': 3, 'K': 4,
-        '10': 10, 'A': 11
-    }
-    
-    # Card strength order (for winning tricks)
-    CARD_STRENGTH = {
-        '7': 1, '8': 2, '9': 3,
-        'J': 4, 'Q': 5, 'K': 6,
-        '10': 7, 'A': 8
-    }
-    
-    SUITS = ['H', 'D', 'C', 'S']  # Hearts, Diamonds, Clubs, Spades
-    RANKS = ['7', '8', '9', 'J', 'Q', 'K', '10', 'A']
-    
     def __init__(self, dealer: int = 0):
-        """Initialize game with dealer position"""
-        self.dealer = dealer
-        self.current_player = (dealer + 1) % 4  # Player after dealer leads
-        self.hands = {0: [], 1: [], 2: [], 3: []}  # Player hands by seat
-        self.current_trick = []  # Cards in current trick
-        self.trick_leader = self.current_player
+        """
+        dealer: seat index (0-3)
+        The first player to play the trick is (dealer + 1) % 4
+        """
+        self.dealer = dealer % 4
+        self.current_player = (self.dealer + 1) % 4
         self.trick_count = 0
-        self.team_scores = {'team_a': 0, 'team_b': 0}  # Teams: 0,2 vs 1,3
-        self.abnat_scores = {'team_a': 0, 'team_b': 0}  # Card value points
-        self.last_trick_winner = None
-        self.deck = []
-        self.played_cards = []  # Track all played cards
-        
+        self.team_scores = {'team_a': 0, 'team_b': 0}
+        self.hands: Dict[int, List[str]] = {}
+        self.current_trick: List[Tuple[int, str]] = []  # list of (seat, card)
         self._create_and_deal()
     
     def _create_and_deal(self):
-        """Create deck and deal cards"""
-        # Create 32-card deck
-        self.deck = []
-        for suit in self.SUITS:
-            for rank in self.RANKS:
-                self.deck.append(f"{rank}{suit}")
-        
-        # Shuffle
-        random.shuffle(self.deck)
-        
-        # Deal 8 cards to each player
-        for i in range(32):
-            player = i % 4
-            self.hands[player].append(self.deck[i])
-        
-        # Sort hands for easier play
-        for player in range(4):
-            self.hands[player] = self._sort_hand(self.hands[player])
-        
-        logger.info(f"Dealt cards. Dealer: {self.dealer}, First player: {self.current_player}")
+        deck = [rank + suit for rank in RANKS for suit in SUITS]
+        random.shuffle(deck)
+        # 8 cards per player (32 cards)
+        for seat in range(4):
+            self.hands[seat] = deck[seat*8:(seat+1)*8]
     
-    def _sort_hand(self, hand: List[str]) -> List[str]:
-        """Sort hand by suit and rank"""
-        def card_sort_key(card):
-            rank = card[:-1]
-            suit = card[-1]
-            suit_order = {'H': 0, 'D': 1, 'C': 2, 'S': 3}
-            rank_order = {'7': 0, '8': 1, '9': 2, 'J': 3, 'Q': 4, 'K': 5, '10': 6, 'A': 7}
-            return (suit_order[suit], rank_order[rank])
-        
-        return sorted(hand, key=card_sort_key)
-    
-    def get_card_suit(self, card: str) -> str:
-        """Extract suit from card string"""
-        return card[-1]
-    
-    def get_card_rank(self, card: str) -> str:
-        """Extract rank from card string"""
-        return card[:-1]
-    
-    def play_card(self, player: int, card: str) -> Tuple[bool, str]:
+    def play_card(self, seat: int, card: str) -> Tuple[bool, str]:
         """
-        Play a card from player's hand
-        Returns (success, message)
+        Attempt to play `card` from `seat`.
+        Returns (success, message). On success, card is removed from hand and added to current_trick.
         """
-        # Check if it's player's turn
-        if player != self.current_player:
+        # Basic validations
+        if seat not in self.hands:
+            return False, "Invalid seat"
+        if self.current_player != seat:
             return False, "Not your turn"
-        
-        # Check if player has the card
-        if card not in self.hands[player]:
+        if card not in self.hands[seat]:
             return False, "Card not in hand"
         
-        # Check if move is legal
-        if not self._is_legal_play(player, card):
-            return False, "Must follow suit"
+        # Enforce following lead suit if possible
+        if self.current_trick:
+            lead_card = self.current_trick[0][1]
+            lead_suit = lead_card[-1]
+            # if player has any card of lead suit but played different suit, reject
+            has_lead_suit = any(c[-1] == lead_suit for c in self.hands[seat])
+            if has_lead_suit and card[-1] != lead_suit:
+                return False, "Must follow suit"
         
         # Play the card
-        self.hands[player].remove(card)
-        self.current_trick.append({
-            'player': player,
-            'card': card
-        })
-        self.played_cards.append(card)
+        self.hands[seat].remove(card)
+        self.current_trick.append((seat, card))
         
-        # Move to next player
-        self.current_player = (self.current_player + 1) % 4
-        
-        # Check if trick is complete
-        if len(self.current_trick) == 4:
-            self._process_trick_end()
-        
-        return True, "Card played successfully"
+        # Advance current_player to next seat who still has cards (or next seat modulo 4)
+        self.current_player = (seat + 1) % 4
+        # If next player has no cards left (round over), still set to next modulo seat; resolution will handle end of trick/round.
+        return True, "Card played"
     
-    def _is_legal_play(self, player: int, card: str) -> bool:
-        """Check if playing this card is legal"""
-        # First card of trick - anything is legal
-        if len(self.current_trick) == 0:
-            return True
-        
-        # Get led suit
-        led_suit = self.get_card_suit(self.current_trick[0]['card'])
-        card_suit = self.get_card_suit(card)
-        
-        # If playing led suit, always legal
-        if card_suit == led_suit:
-            return True
-        
-        # Check if player has any cards of led suit
-        player_suits = [self.get_card_suit(c) for c in self.hands[player]]
-        has_led_suit = led_suit in player_suits
-        
-        # Must follow suit if able
-        if has_led_suit:
-            return False
-        
-        # Can play any card if no led suit
-        return True
-    
-    def _process_trick_end(self):
-        """Process end of trick - determine winner and award points"""
-        # This is called internally, actual processing happens in resolve_trick
-        pass
+    def _card_rank_index(self, card: str) -> int:
+        # card like '10H' or 'AS'; rank is all chars except last (suit)
+        rank = card[:-1]
+        return RANKS.index(rank)
     
     def resolve_trick(self) -> Tuple[int, int]:
         """
-        Resolve completed trick
-        Returns (winner_seat, points_earned)
+        Resolve the current trick (called when current_trick has 4 cards).
+        Returns (winner_seat, points_won_this_trick)
+        Updates team_scores and trick_count, clears current_trick, and sets current_player to winner.
         """
         if len(self.current_trick) != 4:
-            return None, 0
+            raise ValueError("Cannot resolve trick until 4 cards have been played")
         
-        # Get led suit
-        led_suit = self.get_card_suit(self.current_trick[0]['card'])
+        # Lead suit is suit of first played card
+        lead_suit = self.current_trick[0][1][-1]
+        # Filter cards that follow lead suit
+        candidates = [
+            (seat, card) for (seat, card) in self.current_trick
+            if card[-1] == lead_suit
+        ]
+        # Determine highest by rank index
+        winner_seat, winner_card = max(
+            candidates,
+            key=lambda sc: self._card_rank_index(sc[1])
+        )
         
-        # Find highest card in led suit
-        winner = None
-        highest_strength = 0
+        # Calculate points for the trick (sum of individual card points)
+        points = sum(POINTS[c[1][:-1]] for c in self.current_trick)
         
-        for play in self.current_trick:
-            card = play['card']
-            player = play['player']
-            
-            if self.get_card_suit(card) == led_suit:
-                rank = self.get_card_rank(card)
-                strength = self.CARD_STRENGTH[rank]
-                
-                if strength > highest_strength:
-                    highest_strength = strength
-                    winner = player
+        # Assign to winner's team
+        if winner_seat in (0, 2):
+            self.team_scores['team_a'] += points
+        else:
+            self.team_scores['team_b'] += points
         
-        # Calculate abnat (card values) for this trick
-        trick_abnat = 0
-        for play in self.current_trick:
-            rank = self.get_card_rank(play['card'])
-            trick_abnat += self.CARD_VALUES[rank]
-        
-        # Add to team score
-        if winner in [0, 2]:  # Team A
-            self.abnat_scores['team_a'] += trick_abnat
-        else:  # Team B (seats 1, 3)
-            self.abnat_scores['team_b'] += trick_abnat
-        
-        # Track for last trick bonus
         self.trick_count += 1
-        if self.trick_count == 8:
-            self.last_trick_winner = winner
-            # Add last trick bonus
-            if winner in [0, 2]:
-                self.abnat_scores['team_a'] += 10
-            else:
-                self.abnat_scores['team_b'] += 10
-        
-        # Clear trick and set next leader
+        # Clear trick and set next current_player to winner
         self.current_trick = []
-        self.trick_leader = winner
-        self.current_player = winner
+        self.current_player = winner_seat
         
-        logger.info(f"Trick won by player {winner}, abnat: {trick_abnat}")
-        
-        return winner, trick_abnat
+        return winner_seat, points
     
     def calculate_final_scores(self) -> Dict[str, int]:
         """
-        Calculate final round scores from abnat
-        San scoring: round to nearest 10, ×2, ÷10
+        Return final scores for the round/game as dict {'team_a': int, 'team_b': int}
         """
-        final_scores = {}
-        
-        for team in ['team_a', 'team_b']:
-            abnat = self.abnat_scores[team]
-            # Round to nearest 10
-            rounded = round(abnat / 10) * 10
-            # Calculate points
-            points = (rounded * 2) // 10
-            final_scores[team] = points
-        
-        logger.info(f"Final scores - Team A: {final_scores['team_a']}, Team B: {final_scores['team_b']}")
-        
-        return final_scores
-    
-    def get_legal_cards(self, player: int) -> List[str]:
-        """Get list of legal cards player can play"""
-        if player != self.current_player:
-            return []
-        
-        legal_cards = []
-        for card in self.hands[player]:
-            if self._is_legal_play(player, card):
-                legal_cards.append(card)
-        
-        return legal_cards
+        return {
+            'team_a': self.team_scores['team_a'],
+            'team_b': self.team_scores['team_b']
+        }
     
     def get_game_state(self) -> Dict:
-        """Get current game state"""
+        """
+        Return a serializable view of the current game state.
+        Note: hands are returned as counts (so server can decide to reveal full hands when appropriate).
+        """
         return {
             'dealer': self.dealer,
             'current_player': self.current_player,
             'trick_count': self.trick_count,
-            'current_trick': self.current_trick,
-            'team_scores': self.team_scores,
-            'abnat_scores': self.abnat_scores,
-            'cards_remaining': {i: len(self.hands[i]) for i in range(4)}
+            'team_scores': self.team_scores.copy(),
+            'hand_counts': {seat: len(hand) for seat, hand in self.hands.items()},
+            'current_trick': [{'seat': s, 'card': c} for s, c in self.current_trick]
         }

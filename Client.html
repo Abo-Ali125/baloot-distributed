@@ -1,246 +1,879 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Baloot - Demo UI</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0f1724; color:#e6eef8; margin:0; padding:20px; }
-    .container { max-width:1000px; margin:0 auto; }
-    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-    h1 { font-size:20px; margin:0; }
-    .panel { background:#0b1220; border:1px solid #1f2937; padding:12px; border-radius:8px; margin-bottom:12px; }
-    .row { display:flex; gap:12px; align-items:center; }
-    .hand { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
-    .card { background:#0b2540; border:1px solid #254a6b; padding:8px 12px; border-radius:6px; cursor:pointer; user-select:none; }
-    .card:hover { transform:translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,0.6); }
-    .events { max-height:320px; overflow:auto; background:#071022; padding:8px; border-radius:6px; border:1px solid #123043; }
-    button { background:#2563eb; color:white; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; }
-    button.secondary { background:#334155; }
-    input, select { padding:6px 8px; border-radius:6px; border:1px solid #253244; background:#071027; color:#e6eef8; }
-    .small { font-size:13px; color:#9fb4d6; }
-    .status { color:#7ee787; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baloot - Saudi Card Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .left-panel {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .main-game {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h3 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .connection-panel {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.8);
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 100px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(75, 85, 99, 0.8);
+            color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(107, 114, 128, 0.9);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+
+        .status.connected {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status.disconnected {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status.waiting {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .player-card {
+            padding: 12px;
+            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .player-card.ready {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .player-card.current-turn {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
+            to { box-shadow: 0 0 30px rgba(59, 130, 246, 0.4); }
+        }
+
+        .player-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .player-info {
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .game-table {
+            background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.1) 0%, rgba(15, 23, 42, 0.95) 70%);
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-table::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(from 0deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+            animation: rotate 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .trick-area {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 20px;
+        }
+
+        .trick-card {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .trick-card.winner {
+            background: linear-gradient(135deg, #059669, #10b981);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            animation: winner-glow 1s ease-in-out;
+        }
+
+        @keyframes winner-glow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .trick-card .player-label {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: rgba(59, 130, 246, 0.8);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .hand {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            color: #1e293b;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .card:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-color: #3b82f6;
+        }
+
+        .card.hearts, .card.diamonds {
+            color: #dc2626;
+        }
+
+        .card.clubs, .card.spades {
+            color: #1f2937;
+        }
+
+        .scores {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .team-score {
+            text-align: center;
+            padding: 15px 20px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            min-width: 120px;
+        }
+
+        .team-score.winning {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        .team-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .team-points {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+
+        .events-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(7, 16, 34, 0.9);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .event-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-time {
+            color: #64748b;
+            font-size: 0.8rem;
+        }
+
+        .game-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            text-align: center;
+            padding: 12px;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .info-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        .waiting-message {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 1024px) {
+            .game-container {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                width: 100%;
+            }
+            
+            .players-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+            
+            .players-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .hand {
+                gap: 5px;
+            }
+            
+            .card {
+                padding: 8px 12px;
+                font-size: 1rem;
+                min-width: 50px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Baloot — Demo UI</h1>
-      <div class="small">Demo: uses long-polling /api/poll — good for quick demo</div>
-    </header>
-
-    <div class="panel">
-      <div class="row">
-        <label>Room id: <input id="roomId" value="demo-room" /></label>
-        <label>Name: <input id="playerName" value="Player" /></label>
-        <button id="btnJoin">Join Room</button>
-        <button id="btnReady" class="secondary" disabled>Ready</button>
-        <div style="margin-left:auto"><span id="status" class="small">Not joined</span></div>
-      </div>
-    </div>
-
-    <div class="panel" id="roomPanel" style="display:none">
-      <div class="row">
-        <div>
-          <div class="small">Session: <span id="sessionId"></span></div>
-          <div class="small">Seat: <span id="seat"></span></div>
-          <div class="small">Room state: <span id="roomState"></span></div>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Baloot</h1>
+            <div class="subtitle">Saudi Traditional Card Game - Distributed System Demo</div>
         </div>
-        <div style="margin-left:auto">
-          <button id="btnGetState" class="secondary">Refresh Room State</button>
+
+        <div class="game-container">
+            <div class="left-panel">
+                <!-- Connection Panel -->
+                <div class="panel connection-panel">
+                    <h3>🔗 Connection</h3>
+                    <div id="connectionStatus" class="status disconnected">
+                        <div class="status-dot"></div>
+                        <span>Not Connected</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="roomId">Room ID</label>
+                        <input type="text" id="roomId" value="demo-room" placeholder="Enter room ID">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="playerName">Your Name</label>
+                        <input type="text" id="playerName" value="Player" placeholder="Enter your name">
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="btnJoin" class="btn btn-primary">Join Room</button>
+                        <button id="btnReady" class="btn btn-success" disabled>Ready to Play</button>
+                    </div>
+                    
+                    <div class="button-group" style="margin-top: 10px;">
+                        <button id="btnRefresh" class="btn btn-secondary">Refresh State</button>
+                        <button id="btnLeave" class="btn btn-secondary" disabled>Leave Room</button>
+                    </div>
+                </div>
+
+                <!-- Players Panel -->
+                <div class="panel">
+                    <h3>👥 Players</h3>
+                    <div id="playersContainer" class="players-grid">
+                        <div class="player-card">
+                            <div class="player-name">Seat 1</div>
+                            <div class="player-info">Waiting...</div>
+                        </div>
+                        <div class="player-card">
+                            <div class="player-name">Seat 2</div>
+                            <div class="player-info">Waiting...</div>
+                        </div>
+                        <div class="player-card">
+                            <div class="player-name">Seat 3</div>
+                            <div class="player-info">Waiting...</div>
+                        </div>
+                        <div class="player-card">
+                            <div class="player-name">Seat 4</div>
+                            <div class="player-info">Waiting...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Info Panel -->
+                <div class="panel">
+                    <h3>📊 Game Info</h3>
+                    <div class="game-info">
+                        <div class="info-item">
+                            <div class="info-label">Your Seat</div>
+                            <div id="yourSeat" class="info-value">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Your Team</div>
+                            <div id="yourTeam" class="info-value">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Current Trick</div>
+                            <div id="currentTrick" class="info-value">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Round</div>
+                            <div id="currentRound" class="info-value">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-game">
+                <!-- Game Table -->
+                <div class="panel">
+                    <h3>🎮 Game Table</h3>
+                    <div class="game-table" id="gameTable">
+                        <div id="waitingMessage" class="waiting-message">
+                            <div class="loading"></div>
+                            <div style="margin-top: 15px;">Waiting for players to join...</div>
+                        </div>
+                        
+                        <div id="trickArea" class="trick-area" style="display: none;">
+                            <div class="trick-card" id="trickCard0">
+                                <div class="player-label">Seat 1</div>
+                                <div class="card-content">-</div>
+                            </div>
+                            <div class="trick-card" id="trickCard1">
+                                <div class="player-label">Seat 2</div>
+                                <div class="card-content">-</div>
+                            </div>
+                            <div class="trick-card" id="trickCard2">
+                                <div class="player-label">Seat 3</div>
+                                <div class="card-content">-</div>
+                            </div>
+                            <div class="trick-card" id="trickCard3">
+                                <div class="player-label">Seat 4</div>
+                                <div class="card-content">-</div>
+                            </div>
+                        </div>
+                        
+                        <div id="turnIndicator" class="waiting-message" style="display: none;">
+                            Waiting for your turn...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scores -->
+                <div class="panel">
+                    <h3>🏆 Team Scores</h3>
+                    <div class="scores">
+                        <div class="team-score" id="teamAScore">
+                            <div class="team-name">Team A (Seats 1&3)</div>
+                            <div class="team-points">0</div>
+                        </div>
+                        <div class="team-score" id="teamBScore">
+                            <div class="team-name">Team B (Seats 2&4)</div>
+                            <div class="team-points">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Your Hand -->
+                <div class="panel">
+                    <h3>🎴 Your Hand</h3>
+                    <div id="hand" class="hand">
+                        <div class="waiting-message">Cards will appear here when the game starts</div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <div style="margin-top:10px;">
-        <strong>Your hand</strong>
-        <div id="hand" class="hand"></div>
-        <div class="small" style="margin-top:6px">Click a card to play (will POST /api/play_card).</div>
-      </div>
+        <!-- Events Log -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>📝 Game Events</h3>
+            <div id="eventsLog" class="events-log">
+                <div class="event-item">
+                    <span>Welcome to Baloot! Join a room to start playing.</span>
+                    <span class="event-time">${new Date().toLocaleTimeString()}</span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="panel">
-      <strong>Events</strong>
-      <div id="events" class="events"></div>
-    </div>
+    <script>
+        // Game State Management
+        class BalootGame {
+            constructor() {
+                this.sessionId = null;
+                this.seat = null;
+                this.roomId = null;
+                this.polling = false;
+                this.lastTimestamp = 0;
+                this.gameState = 'disconnected';
+                this.players = {};
+                this.currentHand = [];
+                this.currentTrick = [];
+                this.teamScores = { team_a: 0, team_b: 0 };
+                this.currentPlayer = null;
+                this.trickCount = 0;
+                
+                this.initializeEventHandlers();
+            }
 
-    <div style="margin-top:12px; text-align:center" class="small">
-      Tip: open multiple browser windows, join same room with different names to demo multiplayer.
-    </div>
-  </div>
+            initializeEventHandlers() {
+                document.getElementById('btnJoin').onclick = () => this.joinRoom();
+                document.getElementById('btnReady').onclick = () => this.sendReady();
+                document.getElementById('btnRefresh').onclick = () => this.refreshState();
+                document.getElementById('btnLeave').onclick = () => this.leaveRoom();
+            }
 
-<script>
-(() => {
-  const $ = id => document.getElementById(id);
-  let sessionId = null;
-  let seat = null;
-  let roomId = null;
-  let polling = false;
-  let lastTimestamp = 0;
+            async apiCall(endpoint, method = 'GET', body = null) {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
 
-  function logEvent(obj) {
-    const el = document.createElement('div');
-    el.innerText = (new Date()).toLocaleTimeString() + ' — ' + JSON.stringify(obj);
-    document.getElementById('events').prepend(el);
-  }
+                try {
+                    const response = await fetch(endpoint, options);
+                    const text = await response.text();
+                    
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        data = { message: text };
+                    }
 
-  async function api(path, method='GET', body=null) {
-    const opts = { method, headers: {} };
-    if (body) {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
-    }
-    const res = await fetch(path, opts);
-    const txt = await res.text();
-    try {
-      return { ok: res.ok, status: res.status, json: JSON.parse(txt) };
-    } catch (e) {
-      return { ok: res.ok, status: res.status, json: txt };
-    }
-  }
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        data: data
+                    };
+                } catch (error) {
+                    this.logEvent('error', `Network error: ${error.message}`);
+                    return {
+                        ok: false,
+                        status: 0,
+                        data: { error: error.message }
+                    };
+                }
+            }
 
-  async function startPolling() {
-    if (polling) return;
-    polling = true;
-    logEvent({ msg: 'Started long-polling' });
-    while (polling) {
-      try {
-        const url = new URL('/api/poll', window.location.origin);
-        url.searchParams.set('session_id', sessionId);
-        url.searchParams.set('last_timestamp', lastTimestamp || 0);
-        const resp = await fetch(url, { method: 'GET' });
-        if (!resp.ok) {
-          const txt = await resp.text();
-          logEvent({ error: 'poll error', status: resp.status, body: txt });
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
-        }
-        const data = await resp.json();
-        if (data.events && data.events.length) {
-          for (const ev of data.events) {
-            logEvent(ev);
-          }
-          lastTimestamp = data.last_timestamp || (data.events[data.events.length-1].timestamp);
-        }
-        // keep looping; server returns empty events on timeout
-      } catch (e) {
-        logEvent({ error: 'Polling connection failed', detail: e.toString() });
-        await new Promise(r => setTimeout(r, 1500));
-      }
-    }
-  }
+            async joinRoom() {
+                const roomId = document.getElementById('roomId').value.trim();
+                const playerName = document.getElementById('playerName').value.trim();
 
-  async function stopPolling() {
-    polling = false;
-  }
+                if (!roomId || !playerName) {
+                    alert('Please enter both room ID and player name');
+                    return;
+                }
 
-  async function joinRoom() {
-    roomId = $('roomId').value || 'demo-room';
-    const name = $('playerName').value || 'Player';
-    const res = await api('/api/join', 'POST', { room_id: roomId, player_name: name });
-    if (!res.ok) {
-      logEvent({ error: 'join failed', status: res.status, body: res.json });
-      alert('Join failed: ' + JSON.stringify(res.json));
-      return;
-    }
-    sessionId = res.json.session_id;
-    seat = res.json.seat;
-    $('sessionId').innerText = sessionId;
-    $('seat').innerText = seat;
-    $('status').innerText = 'Joined';
-    $('btnReady').disabled = false;
-    $('roomPanel').style.display = 'block';
-    // Try to update room state / hand
-    updateRoomState();
-    startPolling();
-  }
+                const response = await this.apiCall('/api/join', 'POST', {
+                    room_id: roomId,
+                    player_name: playerName
+                });
 
-  async function updateRoomState() {
-    if (!roomId) return;
-    const resp = await api('/api/room/' + encodeURIComponent(roomId));
-    if (!resp.ok) {
-      logEvent({ error: 'get room failed', status: resp.status });
-      return;
-    }
-    const st = resp.json.state || {};
-    $('roomState').innerText = st.game_state || 'unknown';
-    // If server has hands and you are included, server's reconnect endpoint exposes hand; request reconnect
-    if (sessionId) {
-      const r = await api('/api/reconnect', 'POST', { session_id: sessionId });
-      if (r.ok) {
-        renderHand(r.json.hand || r.json.room_state?.game?.hand_counts ? [] : (r.json.hand || []));
-        // If reconnect returned hand explicitly, use it
-        if (r.json.hand) {
-          renderHand(r.json.hand);
-        } else if (r.json.room_state && r.json.room_state.game) {
-          // show counts only if no hand exposed
-          renderHandCounts(r.json.room_state.game.hand_counts || {});
-        }
-      }
-    }
-  }
+                if (response.ok) {
+                    this.sessionId = response.data.session_id;
+                    this.seat = response.data.seat;
+                    this.roomId = roomId;
+                    this.gameState = 'connected';
+                    
+                    this.updateConnectionStatus('connected', 'Connected');
+                    this.updatePlayerInfo();
+                    this.updateGameInfo();
+                    
+                    document.getElementById('btnReady').disabled = false;
+                    document.getElementById('btnLeave').disabled = false;
+                    document.getElementById('btnJoin').disabled = true;
+                    
+                    this.logEvent('success', `Joined room ${roomId} as ${playerName} in seat ${this.seat + 1}`);
+                    this.startPolling();
+                } else {
+                    this.logEvent('error', `Failed to join room: ${response.data.error || 'Unknown error'}`);
+                    alert(`Failed to join room: ${response.data.error || 'Unknown error'}`);
+                }
+            }
 
-  function renderHand(cards) {
-    const container = $('hand');
-    container.innerHTML = '';
-    if (!cards || cards.length === 0) {
-      container.innerHTML = '<div class="small">No cards yet</div>';
-      return;
-    }
-    for (const c of cards) {
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.innerText = c;
-      el.onclick = () => playCard(c);
-      container.appendChild(el);
-    }
-  }
+            async sendReady() {
+                if (!this.sessionId) return;
 
-  function renderHandCounts(counts) {
-    const container = $('hand');
-    container.innerHTML = '';
-    for (const s of [0,1,2,3]) {
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.innerText = `Seat ${s}: ${counts[s] || 0} cards`;
-      container.appendChild(el);
-    }
-  }
+                const response = await this.apiCall('/api/ready', 'POST', {
+                    session_id: this.sessionId
+                });
 
-  async function sendReady() {
-    if (!sessionId) return alert('Join first');
-    const res = await api('/api/ready', 'POST', { session_id: sessionId });
-    if (!res.ok) {
-      logEvent({ error: 'ready failed', status: res.status, body: res.json });
-      return;
-    }
-    logEvent({ msg: 'Ready sent', all_ready: res.json.all_ready });
-  }
+                if (response.ok) {
+                    document.getElementById('btnReady').disabled = true;
+                    this.logEvent('success', 'Marked as ready');
+                } else {
+                    this.logEvent('error', `Failed to ready up: ${response.data.error || 'Unknown error'}`);
+                }
+            }
 
-  async function playCard(card) {
-    if (!sessionId) return alert('Join first');
-    const confirmed = confirm('Play ' + card + '?');
-    if (!confirmed) return;
-    const res = await api('/api/play_card', 'POST', { session_id: sessionId, card });
-    if (!res.ok) {
-      logEvent({ error: 'play failed', status: res.status, body: res.json });
-      alert('Play failed: ' + JSON.stringify(res.json));
-      return;
-    }
-    // update local UI: remove card if present
-    const handDiv = $('hand');
-    const cardEls = handDiv.querySelectorAll('.card');
-    for (const el of cardEls) {
-      if (el.innerText === card) { el.remove(); break; }
-    }
-    logEvent({ msg: 'Card played', card });
-  }
+            async refreshState() {
+                if (!this.roomId) return;
 
-  // DOM hooks
-  $('btnJoin').onclick = joinRoom;
-  $('btnReady').onclick = sendReady;
-  $('btnGetState').onclick = updateRoomState;
+                const response = await this.apiCall(`/api/room/${encodeURIComponent(this.roomId)}`);
+                if (response.ok) {
+                    this.updateGameState(response.data);
+                    this.logEvent('info', 'Game state refreshed');
+                }
 
-})();
-</script>
-</body>
-</html>
+                // Try to reconnect if we have a session
+                if (this.sessionId) {
+                    const reconnectResponse = await this.apiCall('/api/reconnect', 'POST', {
+                        session_id: this.sessionId
+                    });
+
+                    if (reconnectResponse.ok) {
+                        if (reconnectResponse.data.hand) {
+                            this.currentHand = reconnectResponse.data.hand;
+                            this.renderHand();
+                        }
+                        this.logEvent('success', 'Reconnected successfully');
+                    }
+                }
+            }
+
+            leaveRoom() {
+                this.stopPolling();
+                this.sessionId = null;
+                this.seat = null;
+                this.roomId = null;
+                this.gameState = 'disconnected';
+                this.currentHand = [];
+                this.currentTrick = [];
+                
+                this.updateConnectionStatus('disconnected', 'Not Connected');
+                this.resetUI();
+                
+                document.getElementById('btnJoin').disabled = false;
+                document.getElementById('btnReady').disabled = true;
+                document.getElementById('btnLeave').disabled = true;
+                
+                this.logEvent('info', 'Left room');
+            }
+
+            async startPolling() {
+                if (this.polling || !this.sessionId) return;
+
+                this.polling = true;
+                this.logEvent('info', 'Started real-time updates');
+
+                while (this.polling) {
+                    try {
+                        const url = new URL('/api/poll', window.location.origin);
+                        url.searchParams.set('session_id', this.sessionId);
+                        url.searchParams.set('last_timestamp', this.lastTimestamp || 0);
+
+                        const response = await fetch(url);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Poll failed: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        
+                        if (data.events && data.events.length > 0) {
+                            for (const event of data.events) {
+                                this.handleGameEvent(event);
+                            }
+                            this.lastTimestamp = data.last_timestamp || data.events[data.events.length - 1].timestamp;
+                        }
+                    } catch (error) {
+                        this.logEvent('error', `Polling error: ${error.message}`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+

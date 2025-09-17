@@ -121,6 +121,16 @@ class Game:
         """
         Return final scores for the round/game as dict {'team_a': int, 'team_b': int}
         """
+        '''
+        score = {"team_a": 0, "team_b": 0}
+        for winner, cards in tricks:
+            trick_piont = sum(san_card_values[card] for card in cards)
+            scores[winner] += trick_points
+
+            # last trick bonus
+            scores[last_trick_winner] += 10
+
+        '''
         return {
             'team_a': self.team_scores['team_a'],
             'team_b': self.team_scores['team_b']

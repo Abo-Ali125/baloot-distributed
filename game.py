@@ -40,6 +40,7 @@ class Game:
         deck = [rank + suit for rank in RANKS for suit in SUITS]
         random.shuffle(deck)
         # 8 cards per player (32 cards)
+        
         for seat in range(4):
             self.hands[seat] = deck[seat*8:(seat+1)*8]
     
@@ -60,7 +61,7 @@ class Game:
         if self.current_trick:
             lead_card = self.current_trick[0][1]
             lead_suit = lead_card[-1]
-            # if player has any card of lead suit but played different suit, reject
+            # if player has any card of lead suit but played a different suit, reject
             has_lead_suit = any(c[-1] == lead_suit for c in self.hands[seat])
             if has_lead_suit and card[-1] != lead_suit:
                 return False, "Must follow suit"
@@ -139,7 +140,7 @@ class Game:
     def get_game_state(self) -> Dict:
         """
         Return a serializable view of the current game state.
-        Note: hands are returned as counts (so server can decide to reveal full hands when appropriate).
+        Note: hands are returned as counts (so the server can reveal full hands when appropriate).
         """
         return {
             'dealer': self.dealer,

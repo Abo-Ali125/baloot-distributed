@@ -142,7 +142,7 @@ class Room:
             'game_state': self.game_state.value,
             'player_count': sum(1 for p in self.players.values() if p),
             'round_count': self.round_count,
-            'total_scores': self.total_scores
+            'total_scores': self.total_scores,
         }
         
         if self.game:
@@ -170,35 +170,36 @@ class Room:
                 return seat
         return None
 
-class GameHistory:
-    """Track game history and statistics"""
-    def __init__(self):
-        self.tricks = []  # List of all tricks played
-        self.rounds = []  # List of round results
-        
-    def add_trick(self, trick_data: Dict):
+
+class LocalGameHistory:
+    """
+    In‑memory game history for a room.  This class is not persisted to the
+    database – it simply records the sequence of tricks and rounds while a game
+    session is in progress.  Having a distinct name avoids confusion with the
+    database‑backed GameHistory model defined in server.py.
+    """
+
+    def __init__(self) -> None:
+        self.tricks: List[Dict] = []  # List of all tricks played
+        self.rounds: List[Dict] = []  # List of round results
+
+    def add_trick(self, trick_data: Dict) -> None:
         """Record a completed trick"""
-        self.tricks.append({
-            'timestamp': datetime.now(),
-            'cards': trick_data.get('cards', []),
-            'winner': trick_data.get('winner'),
-            'points': trick_data.get('points', 0)
-        })
-    
-    def add_round(self, round_data: Dict):
+        self.tricks.append(
+            {
+                'timestamp': datetime.now(),
+                'cards': trick_data.get('cards', []),
+                'winner': trick_data.get('winner'),
+                'points': trick_data.get('points', 0),
+            }
+        )
+
+    def add_round(self, round_data: Dict) -> None:
         """Record a completed round"""
-        self.rounds.append({
-            'timestamp': datetime.now(),
-            'final_scores': round_data.get('final_scores', {}),
-            'trick_count': round_data.get('trick_count', 0),
-            'winner': round_data.get('winner')
-        })
-    
-    def get_statistics(self) -> Dict:
-        """Get game statistics"""
-        return {
-            'total_tricks': len(self.tricks),
-            'total_rounds': len(self.rounds),
-            'tricks_history': self.tricks[-10:],  # Last 10 tricks
-            'rounds_history': self.rounds
-        }
+        self.rounds.append(
+            {
+                'timestamp': datetime.now(),
+                'final_scores': round_data.get('final_scores', {}),
+                'trick_count': round_data.get('trick_count', 0),
+            }
+        )

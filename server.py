@@ -145,6 +145,7 @@ def create_session_token():
     """Generate secure session token"""
     return secrets.token_urlsafe(32)
 
+
 def handle_round_end(room, room_id):
     """Handle end of round logic with database updates"""
     final_scores = room.game.calculate_final_scores()
@@ -232,6 +233,7 @@ def start_new_round(room, room_id):
         'message': 'Ready up for next round!'
     })
 
+
 def get_or_create_room(room_id):
     """Get existing room or create new one"""
     with rooms_lock:
@@ -240,6 +242,7 @@ def get_or_create_room(room_id):
             events_queue[room_id] = deque(maxlen=MAX_EVENTS_PER_ROOM)
             logger.info(f"Created new room: {room_id}")
         return rooms[room_id]
+
 
 def broadcast_event(room_id, event_type, data):
     """Send event to all players in room"""
@@ -269,6 +272,7 @@ def index():
     except Exception as e:
         logger.error(f"Error serving index: {e}")
         return jsonify({'error': 'Server error'}), 500
+
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -323,6 +327,7 @@ def register():
         db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 500
 
+
 @app.route('/api/login', methods=['POST'])
 def login():
     """Login with username/email and password"""
@@ -364,6 +369,7 @@ def login():
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
 
+
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
@@ -374,11 +380,13 @@ def logout():
     session.clear()
     return jsonify({'success': True}), 200
 
+
 @app.route('/api/profile', methods=['GET'])
 @login_required
 def get_profile():
     """Get current user profile"""
     return jsonify(request.current_user.to_dict()), 200
+
 
 @app.route('/api/profile', methods=['PUT'])
 @login_required
@@ -403,6 +411,7 @@ def update_profile():
         db.session.rollback()
         return jsonify({'error': 'Update failed'}), 500
 
+
 @app.route('/api/stats/<int:user_id>', methods=['GET'])
 def get_user_stats(user_id):
     """Get user statistics"""
@@ -415,58 +424,68 @@ def get_user_stats(user_id):
     
     return jsonify({
         'user': user.to_dict(),
-        'recent_games': [{
-            'room_id': g.room_id,
-            'team': g.team,
-            'score': f"{g.team_score} - {g.opponent_score}",
-            'won': g.won,
-            'played_at': g.played_at.isoformat()
-        } for g in recent_games]
+        'recent_games': [
+            {
+                'room_id': g.room_id,
+                'team': g.team,
+                'score': f"{g.team_score} - {g.opponent_score}",
+                'won': g.won,
+                'played_at': g.played_at.isoformat()
+            }
+            for g in recent_games
+        ]
     }), 200
+
 
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
     """Get top players leaderboard"""
     top_players = User.query.order_by(
-        User.level.desc(), 
+        User.level.desc(),
         User.win_rate.desc(),
         User.total_points.desc()
     ).limit(20).all()
     
-    return jsonify([{
-        'rank': i + 1,
-        'username': p.username,
-        'display_name': p.display_name or p.username,
-        'level': p.level,
-        'games_played': p.games_played,
-        'games_won': p.games_won,
-        'win_rate': p.win_rate,
-        'total_points': p.total_points
-    } for i, p in enumerate(top_players)]), 200
+    return jsonify([
+        {
+            'rank': i + 1,
+            'username': p.username,
+            'display_name': p.display_name or p.username,
+            'level': p.level,
+            'games_played': p.games_played,
+            'games_won': p.games_won,
+            'win_rate': p.win_rate,
+            'total_points': p.total_points
+        }
+        for i, p in enumerate(top_players)
+    ]), 200
+
 
 @app.route('/api/friends', methods=['GET'])
 @login_required
 def get_friends():
     """Get user's friends list"""
     friendships = Friendship.query.filter(
-        ((Friendship.user_id == request.current_user.id) | 
-         (Friendship.friend_id == request.current_user.id)) &
-        (Friendship.status == 'accepted')
+        ((Friendship.user_id == request.current_user.id) | (Friendship.friend_id == request.current_user.id))
+        & (Friendship.status == 'accepted')
     ).all()
     
     friends = []
     for f in friendships:
         friend = f.friend if f.user_id == request.current_user.id else f.user
-        friends.append({
-            'id': friend.id,
-            'username': friend.username,
-            'display_name': friend.display_name or friend.username,
-            'avatar_url': friend.avatar_url,
-            'level': friend.level,
-            'online': any(s['user'].id == friend.id for s in user_sessions.values())
-        })
+        friends.append(
+            {
+                'id': friend.id,
+                'username': friend.username,
+                'display_name': friend.display_name or friend.username,
+                'avatar_url': friend.avatar_url,
+                'level': friend.level,
+                'online': any(s['user'].id == friend.id for s in user_sessions.values()),
+            }
+        )
     
     return jsonify(friends), 200
+
 
 @app.route('/api/friends/add', methods=['POST'])
 @login_required
@@ -485,10 +504,8 @@ def add_friend():
         
         # Check if friendship exists
         existing = Friendship.query.filter(
-            ((Friendship.user_id == request.current_user.id) & 
-             (Friendship.friend_id == friend.id)) |
-            ((Friendship.user_id == friend.id) & 
-             (Friendship.friend_id == request.current_user.id))
+            ((Friendship.user_id == request.current_user.id) & (Friendship.friend_id == friend.id))
+            | ((Friendship.user_id == friend.id) & (Friendship.friend_id == request.current_user.id))
         ).first()
         
         if existing:
@@ -497,7 +514,7 @@ def add_friend():
         friendship = Friendship(
             user_id=request.current_user.id,
             friend_id=friend.id,
-            status='pending'
+            status='pending',
         )
         db.session.add(friendship)
         db.session.commit()
@@ -508,6 +525,64 @@ def add_friend():
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
+
+# ---------------------------------------------------------------------------
+# Friend request management
+
+@app.route('/api/friends/requests', methods=['GET'])
+@login_required
+def get_friend_requests():
+    """List incoming friend requests for the current user"""
+    pending = Friendship.query.filter_by(friend_id=request.current_user.id, status='pending').all()
+    requests = []
+    for f in pending:
+        # The sender is the one who initiated the request
+        sender = User.query.get(f.user_id)
+        if sender:
+            requests.append({
+                'id': sender.id,
+                'username': sender.username,
+                'display_name': sender.display_name or sender.username,
+                'avatar_url': sender.avatar_url,
+                'sent_at': f.created_at.isoformat() if f.created_at else None,
+            })
+    return jsonify(requests), 200
+
+
+@app.route('/api/friends/respond', methods=['POST'])
+@login_required
+def respond_friend_request():
+    """Accept or decline a pending friend request"""
+    try:
+        data = request.get_json()
+        friend_username = data.get('username')
+        action = data.get('action')  # expected values: 'accept' or 'decline'
+        if not friend_username or action not in {'accept', 'decline'}:
+            return jsonify({'error': 'Username and valid action required'}), 400
+
+        friend = User.query.filter_by(username=friend_username).first()
+        if not friend:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Find the friendship record (current user is the recipient)
+        friendship = Friendship.query.filter_by(user_id=friend.id, friend_id=request.current_user.id).first()
+        if not friendship or friendship.status != 'pending':
+            return jsonify({'error': 'Friend request not found'}), 404
+
+        if action == 'accept':
+            friendship.status = 'accepted'
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Friend request accepted'}), 200
+        else:
+            # Decline removes the friendship record entirely
+            db.session.delete(friendship)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Friend request declined'}), 200
+    except Exception as e:
+        logger.error(f"Respond friend request error: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to process friend request'}), 500
+
 
 @app.route('/api/join', methods=['POST'])
 @login_required
@@ -538,38 +613,146 @@ def join_room():
             'player': player,
             'room_id': room_id,
             'seat': seat,
-            'user_id': request.current_user.id
+            'user_id': request.current_user.id,
         }
         
-        broadcast_event(room_id, 'player_joined', {
-            'player_name': player.name,
-            'seat': seat,
-            'players': room.get_players_info()
-        })
+        broadcast_event(
+            room_id,
+            'player_joined',
+            {
+                'player_name': player.name,
+                'seat': seat,
+                'players': room.get_players_info(),
+            },
+        )
         
-        return jsonify({
-            'session_id': session_id,
-            'seat': seat,
-            'room_state': room.get_state(),
-            'players': room.get_players_info()
-        }), 200
+        return (
+            jsonify(
+                {
+                    'session_id': session_id,
+                    'seat': seat,
+                    'room_state': room.get_state(),
+                    'players': room.get_players_info(),
+                }
+            ),
+            200,
+        )
         
     except Exception as e:
         logger.error(f"Join room error: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
     """Get list of active rooms"""
     active_rooms = []
     for room_id, room in rooms.items():
-        active_rooms.append({
-            'room_id': room_id,
-            'player_count': sum(1 for p in room.players.values() if p),
-            'game_state': room.game_state.value,
-            'total_scores': room.total_scores
-        })
+        active_rooms.append(
+            {
+                'room_id': room_id,
+                'player_count': sum(1 for p in room.players.values() if p),
+                'game_state': room.game_state.value,
+                'total_scores': room.total_scores,
+            }
+        )
     return jsonify(active_rooms), 200
+
+# ---------------------------------------------------------------------------
+# Game flow endpoints
+
+@app.route('/api/ready', methods=['POST'])
+@login_required
+def player_ready():
+    """Mark a player as ready.  When all players in a room are ready, a new game starts."""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        if not session_id or session_id not in player_sessions:
+            return jsonify({'error': 'Invalid session'}), 400
+        session_data = player_sessions[session_id]
+        room_id = session_data['room_id']
+        seat = session_data['seat']
+        room = rooms.get(room_id)
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+
+        # Mark this player ready
+        player = session_data['player']
+        player.is_ready = True
+        broadcast_event(room_id, 'player_ready', {
+            'seat': seat,
+            'player_name': player.name,
+            'ready': True
+        })
+
+        # If everyone is ready, start the game
+        if room.all_ready():
+            if room.start_game():
+                broadcast_event(room_id, 'game_started', {
+                    'dealer': room.game.dealer,
+                    'hands': {s: len(h) for s, h in room.game.hands.items()},
+                    'round_number': room.round_count
+                })
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Ready error: {e}")
+        return jsonify({'error': 'Failed to set ready status'}), 500
+
+
+@app.route('/api/poll', methods=['GET'])
+@login_required
+def poll_events():
+    """Poll for new events for a given room.  Clients should supply a timestamp (since) to get incremental updates."""
+    try:
+        room_id = request.args.get('room_id')
+        since = float(request.args.get('since', 0))
+        if not room_id or room_id not in events_queue:
+            return jsonify({'events': []}), 200
+        events = [e for e in list(events_queue[room_id]) if e['timestamp'] > since]
+        return jsonify({'events': events, 'latest': events[-1]['timestamp'] if events else since}), 200
+    except Exception as e:
+        logger.error(f"Poll error: {e}")
+        return jsonify({'error': 'Failed to poll events'}), 500
+
+
+@app.route('/api/reconnect', methods=['POST'])
+@login_required
+def reconnect_session():
+    """Re‑establish a session when a client reconnects.  Marks the player as connected."""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        if not session_id or session_id not in player_sessions:
+            return jsonify({'error': 'Invalid session'}), 400
+        session_data = player_sessions[session_id]
+        room_id = session_data['room_id']
+        seat = session_data['seat']
+        room = rooms.get(room_id)
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+        # Mark player connected
+        player = session_data['player']
+        player.is_connected = True
+        broadcast_event(room_id, 'player_reconnected', {
+            'seat': seat,
+            'player_name': player.name
+        })
+        return jsonify({'success': True, 'seat': seat}), 200
+    except Exception as e:
+        logger.error(f"Reconnect error: {e}")
+        return jsonify({'error': 'Failed to reconnect'}), 500
+
+
+@app.route('/api/rooms/<room_id>', methods=['GET'])
+@login_required
+def get_room_state(room_id):
+    """Fetch the current state of a room (players, scores, game state)."""
+    room = rooms.get(room_id)
+    if not room:
+        return jsonify({'error': 'Room not found'}), 404
+    return jsonify(room.get_state()), 200
+
 
 # Enhanced play_card endpoint
 @app.route('/api/play_card', methods=['POST'])
@@ -595,7 +778,11 @@ def play_card_enhanced():
             return jsonify({'error': 'Game not in progress'}), 400
         
         if room.game.current_player != seat:
-            current_player_name = room.players[room.game.current_player].name if room.players[room.game.current_player] else f"Player {room.game.current_player + 1}"
+            current_player_name = (
+                room.players[room.game.current_player].name
+                if room.players[room.game.current_player]
+                else f"Player {room.game.current_player + 1}"
+            )
             return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
         
         success, message = room.game.play_card(seat, card)
@@ -605,62 +792,89 @@ def play_card_enhanced():
         
         player_name = session_data['player'].name
         
-        broadcast_event(room_id, 'card_played', {
-            'seat': seat,
-            'player_name': player_name,
-            'card': card,
-            'current_trick': [{'seat': s, 'card': c, 'player': room.players[s].name if room.players[s] else f"Player {s+1}"} for s, c in room.game.current_trick],
-            'next_player': room.game.current_player,
-            'next_player_name': room.players[room.game.current_player].name if room.players[room.game.current_player] else None
-        })
+        broadcast_event(
+            room_id,
+            'card_played',
+            {
+                'seat': seat,
+                'player_name': player_name,
+                'card': card,
+                'current_trick': [
+                    {
+                        'seat': s,
+                        'card': c,
+                        'player': room.players[s].name
+                        if room.players[s]
+                        else f"Player {s+1}",
+                    }
+                    for s, c in room.game.current_trick
+                ],
+                'next_player': room.game.current_player,
+                'next_player_name': room.players[room.game.current_player].name
+                if room.players[room.game.current_player]
+                else None,
+            },
+        )
         
         if len(room.game.current_trick) == 4:
             try:
                 winner_seat, points = room.game.resolve_trick()
                 winner_name = room.players[winner_seat].name
                 
-                broadcast_event(room_id, 'trick_won', {
-                    'winner_seat': winner_seat,
-                    'winner_name': winner_name,
-                    'points': points,
-                    'team_scores': room.game.team_scores.copy(),
-                    'trick_count': room.game.trick_count,
-                    'next_leader': winner_seat,
-                    'next_leader_name': winner_name
-                })
+                broadcast_event(
+                    room_id,
+                    'trick_won',
+                    {
+                        'winner_seat': winner_seat,
+                        'winner_name': winner_name,
+                        'points': points,
+                        'team_scores': room.game.team_scores.copy(),
+                        'trick_count': room.game.trick_count,
+                        'next_leader': winner_seat,
+                        'next_leader_name': winner_name,
+                    },
+                )
                 
                 cards_remaining = sum(len(hand) for hand in room.game.hands.values())
                 if cards_remaining == 0:
                     handle_round_end(room, room_id)
                 else:
-                    broadcast_event(room_id, 'next_trick_ready', {
-                        'leader': winner_seat,
-                        'leader_name': winner_name,
-                        'trick_number': room.game.trick_count + 1
-                    })
+                    broadcast_event(
+                        room_id,
+                        'next_trick_ready',
+                        {
+                            'leader': winner_seat,
+                            'leader_name': winner_name,
+                            'trick_number': room.game.trick_count + 1,
+                        },
+                    )
                     
             except Exception as e:
                 logger.error(f"Error resolving trick: {e}")
                 return jsonify({'error': 'Failed to resolve trick'}), 500
         
-        return jsonify({
-            'success': True,
-            'message': f'Played {card}',
-            'cards_in_hand': len(room.game.hands[seat]),
-            'current_player': room.game.current_player
-        }), 200
+        return (
+            jsonify(
+                {
+                    'success': True,
+                    'message': f'Played {card}',
+                    'cards_in_hand': len(room.game.hands[seat]),
+                    'current_player': room.game.current_player,
+                }
+            ),
+            200,
+        )
         
     except Exception as e:
         logger.error(f"Error in play_card: {e}")
         return jsonify({'error': str(e)}), 500
 
-# Keep all other endpoints from original server...
-# (ready, poll, reconnect, room state, etc.)
 
 @app.route('/health')
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': time.time()}), 200
+
 
 # Initialize database
 with app.app_context():
@@ -682,7 +896,7 @@ CLIENT_HTML = '''
 </head>
 <body>
     <!-- Include all the HTML body content from your Client.html file here -->
-    <!-- ... (full HTML content) ... */
+    <!-- ... (full HTML content) ... -->
     <script>
         // Include enhanced JavaScript with authentication
         // ... (full JS content with login/register features) ...
@@ -690,6 +904,7 @@ CLIENT_HTML = '''
 </body>
 </html>
 '''
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)

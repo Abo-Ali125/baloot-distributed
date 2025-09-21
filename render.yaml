@@ -1,11 +1,15 @@
 services:
-  - type: web
-    name: baloot-card-game
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn server:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
-    plan: free
-    healthCheckPath: /health
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
+
+* type: web
+  name: baloot-server
+  env: python
+  plan: free
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn server\:app --bind 0.0.0.0:\$PORT --workers 2 --threads 8 --timeout 120
+  envVars:
+
+  * key: SECRET\_KEY
+    generateValue: true
+  * key: DATABASE\_URL
+    value: sqlite:///baloot.db
+    autoDeploy: true

@@ -1,7 +1,7 @@
 import random
 from typing import Dict, List, Tuple
 
-# Minimal playable logic to support UI events
+# Minimal playable logic to support UI events                                                                                                                                                                                                                                  H Com
 SUITS = ['S','H','D','C']
 RANKS = ['A','K','Q','J','10','9','8','7']
 CARD_POINTS = {'A':11,'K':4,'Q':3,'J':2,'10':10,'9':0,'8':0,'7':0}
@@ -11,6 +11,7 @@ class Game:
         self.dealer = 0
         self.current_player = 0
         self.hands: Dict[int, List[str]] = {0:[],1:[],2:[],3:[]}
+        
         self.current_trick: List[Tuple[int,str]] = []  # list of (seat, card)
         self.trick_count = 0
         self.team_scores = {'team_a':0, 'team_b':0}

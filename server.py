@@ -1,7 +1,6 @@
 """
-Baloot Game Server - Complete Version (fixed)
-HTTP server with authentication, user profiles, and real-time game updates
-Production-ready for Render.com deployment
+Baloot Game Server
+Simple HTTP server for multiplayer card game
 """
 import uuid
 import time
@@ -46,14 +45,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global storage
+# In-memory game state (rooms, sessions, events)
 rooms = {}
 rooms_lock = Lock()
 player_sessions = {}
 events_queue = {}
-user_sessions = {}  # Maps session tokens to user data
+user_sessions = {}
 
-# Configuration constants
+# Game constants
 MAX_PLAYERS_PER_ROOM = 4
 MAX_EVENTS_PER_ROOM = 100
 PORT = int(os.environ.get('PORT', 10000))
@@ -66,13 +65,9 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Profile information
     display_name = db.Column(db.String(100))
     avatar_url = db.Column(db.String(200))
     bio = db.Column(db.Text)
-
-    # Game statistics
     games_played = db.Column(db.Integer, default=0)
     games_won = db.Column(db.Integer, default=0)
     total_points = db.Column(db.Integer, default=0)
@@ -97,28 +92,31 @@ class User(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-# ---------------------------------------------------------------------------
-# Auth helpers
+class Friendship(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    friend_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default='pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', foreign_keys=[user_id], backref='friendships_sent')
+    friend = db.relationship('User', foreign_keys=[friend_id], backref='friendships_received')
 
+# Auth helpers
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_token = request.headers.get('Authorization') or session.get('auth_token')
         if not auth_token or auth_token not in user_sessions:
             return jsonify({'error': 'Authentication required'}), 401
-        # Update last activity
         user_sessions[auth_token]['last_activity'] = datetime.utcnow()
         request.current_user = user_sessions[auth_token]['user']
         return f(*args, **kwargs)
     return decorated_function
 
-
 def create_session_token() -> str:
     return secrets.token_urlsafe(32)
 
-# ---------------------------------------------------------------------------
-# In-room helpers
-
+# Room helpers
 def get_or_create_room(room_id: str) -> Room:
     with rooms_lock:
         if room_id not in rooms:
@@ -127,33 +125,26 @@ def get_or_create_room(room_id: str) -> Room:
             logger.info(f"Created new room: {room_id}")
         return rooms[room_id]
 
-
 def broadcast_event(room_id: str, event_type: str, data: dict) -> None:
     if room_id in events_queue:
         event = {'type': event_type, 'data': data, 'timestamp': time.time()}
         events_queue[room_id].append(event)
-        logger.info(f"Broadcasting {event_type} to room {room_id}")
+        logger.info(f"Event: {event_type} in room {room_id}")
 
-# ---------------------------------------------------------------------------
 # Routes
-
 @app.route('/')
 def index():
     """Serve the main game client"""
     try:
         current_dir = Path(__file__).parent
-        # Prefer the uploaded Client.html (note capital C)
         for candidate in ('Client.html', 'client.html', 'index.html'):
             client_path = current_dir / candidate
             if client_path.exists():
                 return client_path.read_text(encoding='utf-8')
-        # Fallback to embedded minimal HTML if file missing
         return render_template_string(CLIENT_HTML)
     except Exception as e:
         logger.error(f"Error serving index: {e}")
         return jsonify({'error': 'Server error'}), 500
-
-# ---- Auth & profile ----
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -191,7 +182,6 @@ def register():
         db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 500
 
-
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
@@ -212,7 +202,6 @@ def login():
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
 
-
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
@@ -222,12 +211,10 @@ def logout():
     session.clear()
     return jsonify({'success': True}), 200
 
-
 @app.route('/api/profile', methods=['GET'])
 @login_required
 def get_profile():
     return jsonify(request.current_user.to_dict()), 200
-
 
 @app.route('/api/profile', methods=['PUT'])
 @login_required
@@ -248,36 +235,20 @@ def update_profile():
         db.session.rollback()
         return jsonify({'error': 'Update failed'}), 500
 
-# ---- Friends & leaderboard ----
-
-class Friendship(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    friend_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    status = db.Column(db.String(20), default='pending')  # pending, accepted, blocked
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    user = db.relationship('User', foreign_keys=[user_id], backref='friendships_sent')
-    friend = db.relationship('User', foreign_keys=[friend_id], backref='friendships_received')
-
-
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
     top_players = User.query.order_by(User.level.desc(), User.win_rate.desc(), User.total_points.desc()).limit(20).all()
-    return jsonify([
-        {
-            'rank': i + 1,
-            'username': p.username,
-            'display_name': p.display_name or p.username,
-            'level': p.level,
-            'games_played': p.games_played,
-            'games_won': p.games_won,
-            'win_rate': p.win_rate,
-            'total_points': p.total_points,
-        }
-        for i, p in enumerate(top_players)
-    ]), 200
-
+    return jsonify([{
+        'rank': i + 1,
+        'username': p.username,
+        'display_name': p.display_name or p.username,
+        'level': p.level,
+        'games_played': p.games_played,
+        'games_won': p.games_won,
+        
+        'win_rate': p.win_rate,
+        'total_points': p.total_points,
+    } for i, p in enumerate(top_players)]), 200
 
 @app.route('/api/friends', methods=['GET'])
 @login_required
@@ -295,13 +266,13 @@ def get_friends():
         friends.append({
             'id': friend.id,
             'username': friend.username,
+            
             'display_name': friend.display_name or friend.username,
             'avatar_url': friend.avatar_url,
             'level': friend.level,
             'online': any(s['user'].id == friend.id for s in user_sessions.values()),
         })
     return jsonify(friends), 200
-
 
 @app.route('/api/friends/add', methods=['POST'])
 @login_required
@@ -318,6 +289,7 @@ def add_friend():
         existing = Friendship.query.filter(
             or_(
                 and_(Friendship.user_id == request.current_user.id, Friendship.friend_id == friend.id),
+
                 and_(Friendship.user_id == friend.id, Friendship.friend_id == request.current_user.id),
             )
         ).first()
@@ -331,7 +303,6 @@ def add_friend():
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
-
 
 @app.route('/api/friends/requests', methods=['GET'])
 @login_required
@@ -350,14 +321,13 @@ def get_friend_requests():
             })
     return jsonify(requests), 200
 
-
 @app.route('/api/friends/respond', methods=['POST'])
 @login_required
 def respond_friend_request():
     try:
         data = request.get_json(force=True)
         friend_username = data.get('username')
-        action = data.get('action')  # 'accept' | 'decline'
+        action = data.get('action')
         if not friend_username or action not in {'accept', 'decline'}:
             return jsonify({'error': 'Username and valid action required'}), 400
         friend = User.query.filter_by(username=friend_username).first()
@@ -379,8 +349,6 @@ def respond_friend_request():
         db.session.rollback()
         return jsonify({'error': 'Failed to process friend request'}), 500
 
-# ---- Rooms & gameplay ----
-
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
     active_rooms = []
@@ -392,7 +360,6 @@ def get_active_rooms():
             'total_scores': room.total_scores,
         })
     return jsonify(active_rooms), 200
-
 
 @app.route('/api/join', methods=['POST'])
 @login_required
@@ -418,7 +385,6 @@ def join_room():
         logger.error(f"Join room error: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/ready', methods=['POST'])
 @login_required
 def player_ready():
@@ -440,19 +406,23 @@ def player_ready():
             if room.start_game():
                 broadcast_event(room_id, 'game_started', {
                     'dealer': room.game.dealer,
-                    'hands': {s: len(h) for s, h in room.game.hands.items()},
                     'round_number': room.round_count,
                 })
+                # FIX: send cards to each player
+                for s in range(4):
+                    if room.players[s]:
+                        broadcast_event(room_id,'cards_dealt',{
+                            'seat':s,
+                            'cards':room.game.hands[s]
+                        })
         return jsonify({'success': True}), 200
     except Exception as e:
         logger.error(f"Ready error: {e}")
         return jsonify({'error': 'Failed to set ready status'}), 500
 
-
 @app.route('/api/poll', methods=['GET'])
 @login_required
 def poll_events():
-    """Accepts either (room_id, since) or (session_id, last_timestamp). Returns JSON only."""
     try:
         room_id = request.args.get('room_id')
         since_str = request.args.get('since')
@@ -474,7 +444,6 @@ def poll_events():
     except Exception as e:
         logger.error(f"Poll error: {e}")
         return jsonify({'error': 'Failed to poll events'}), 500
-
 
 @app.route('/api/reconnect', methods=['POST'])
 @login_required
@@ -498,7 +467,6 @@ def reconnect_session():
         logger.error(f"Reconnect error: {e}")
         return jsonify({'error': 'Failed to reconnect'}), 500
 
-
 @app.route('/api/rooms/<room_id>', methods=['GET'])
 @login_required
 def get_room_state(room_id):
@@ -506,7 +474,6 @@ def get_room_state(room_id):
     if not room:
         return jsonify({'error': 'Room not found'}), 404
     return jsonify(room.get_state()), 200
-
 
 @app.route('/api/play_card', methods=['POST'])
 def play_card_enhanced():
@@ -525,7 +492,8 @@ def play_card_enhanced():
         if room.game_state != GameState.IN_PROGRESS:
             return jsonify({'error': 'Game not in progress'}), 400
         if room.game.current_player != seat:
-            current_player_name = room.players[room.game.current_player].name if room.players[room.game.current_player] else f"Player {room.game.current_player + 1}"
+            curr_player = room.players[room.game.current_player]
+            current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
             return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
         success, message = room.game.play_card(seat, card)
         if not success:
@@ -573,21 +541,21 @@ def play_card_enhanced():
         logger.error(f"Error in play_card: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/health')
 def health():
     return jsonify({'status': 'healthy', 'timestamp': time.time()}), 200
 
-# ---- Round/End helpers ----
-
 def handle_round_end(room: Room, room_id: str) -> None:
     final_scores = room.game.calculate_final_scores()
     if final_scores['team_a'] > final_scores['team_b']:
-        round_winner = 'Team A'; winning_score = final_scores['team_a']
+        round_winner = 'Team A'
+        winning_score = final_scores['team_a']
     elif final_scores['team_b'] > final_scores['team_a']:
-        round_winner = 'Team B'; winning_score = final_scores['team_b']
+        round_winner = 'Team B'
+        winning_score = final_scores['team_b']
     else:
-        round_winner = 'Tie'; winning_score = final_scores['team_a']
+        round_winner = 'Tie'
+        winning_score = final_scores['team_a']
     room.total_scores['team_a'] += final_scores['team_a']
     room.total_scores['team_b'] += final_scores['team_b']
     broadcast_event(room_id, 'round_complete', {
@@ -597,14 +565,12 @@ def handle_round_end(room: Room, room_id: str) -> None:
         'total_scores': room.total_scores,
         'round_number': room.round_count,
     })
-    # Win at 152
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         broadcast_event(room_id, 'game_complete', {'game_winner': game_winner, 'final_total_scores': room.total_scores})
         room.game_state = GameState.FINISHED
     else:
         start_new_round(room, room_id)
-
 
 def start_new_round(room: Room, room_id: str) -> None:
     for p in room.players.values():
@@ -618,21 +584,17 @@ def start_new_round(room: Room, room_id: str) -> None:
         'message': 'Ready up for next round!'
     })
 
-# ---- JSON-only errors for /api/* ----
-
 @app.errorhandler(404)
 def _json_404(e):
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Not found', 'path': request.path}), 404
     return e
 
-
 @app.errorhandler(405)
 def _json_405(e):
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Method not allowed', 'path': request.path}), 405
     return e
-
 
 @app.errorhandler(Exception)
 def _json_500(e):
@@ -643,16 +605,9 @@ def _json_500(e):
         return jsonify({'error': 'Server error', 'detail': str(e)}), code
     raise e
 
-# Initialize database
 with app.app_context():
     db.create_all()
     logger.info("Database initialized")
-
-# Minimal fallback client (rarely used)
-CLIENT_HTML = '''
-<!doctype html><html><head><meta charset="utf-8"><title>Baloot</title></head>
-<body><h1>Baloot server running</h1><p>Upload Client.html next to server.py.</p></body></html>
-'''
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)

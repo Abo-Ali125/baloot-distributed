@@ -141,7 +141,7 @@ def index():
             client_path = current_dir / candidate
             if client_path.exists():
                 return client_path.read_text(encoding='utf-8')
-        return render_template_string(CLIENT_HTML)
+        return jsonify({'error': 'Client file not found'}), 404
     except Exception as e:
         logger.error(f"Error serving index: {e}")
         return jsonify({'error': 'Server error'}), 500
@@ -245,7 +245,6 @@ def get_leaderboard():
         'level': p.level,
         'games_played': p.games_played,
         'games_won': p.games_won,
-        
         'win_rate': p.win_rate,
         'total_points': p.total_points,
     } for i, p in enumerate(top_players)]), 200
@@ -266,7 +265,6 @@ def get_friends():
         friends.append({
             'id': friend.id,
             'username': friend.username,
-            
             'display_name': friend.display_name or friend.username,
             'avatar_url': friend.avatar_url,
             'level': friend.level,
@@ -289,13 +287,12 @@ def add_friend():
         existing = Friendship.query.filter(
             or_(
                 and_(Friendship.user_id == request.current_user.id, Friendship.friend_id == friend.id),
-
                 and_(Friendship.user_id == friend.id, Friendship.friend_id == request.current_user.id),
             )
         ).first()
         if existing:
             return jsonify({'error': 'Friend request already exists'}), 400
-        friendship = Friendship(user_id=request.current_user.id, friend_id=friend.id, status='pending')
+        friendship = Friendship(user_id=request.current_user.id, friend_id=friend.id, status='accepted')
         db.session.add(friendship)
         db.session.commit()
         return jsonify({'success': True}), 200
@@ -303,51 +300,6 @@ def add_friend():
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
-
-@app.route('/api/friends/requests', methods=['GET'])
-@login_required
-def get_friend_requests():
-    pending = Friendship.query.filter_by(friend_id=request.current_user.id, status='pending').all()
-    requests = []
-    for f in pending:
-        sender = User.query.get(f.user_id)
-        if sender:
-            requests.append({
-                'id': sender.id,
-                'username': sender.username,
-                'display_name': sender.display_name or sender.username,
-                'avatar_url': sender.avatar_url,
-                'sent_at': f.created_at.isoformat() if f.created_at else None,
-            })
-    return jsonify(requests), 200
-
-@app.route('/api/friends/respond', methods=['POST'])
-@login_required
-def respond_friend_request():
-    try:
-        data = request.get_json(force=True)
-        friend_username = data.get('username')
-        action = data.get('action')
-        if not friend_username or action not in {'accept', 'decline'}:
-            return jsonify({'error': 'Username and valid action required'}), 400
-        friend = User.query.filter_by(username=friend_username).first()
-        if not friend:
-            return jsonify({'error': 'User not found'}), 404
-        friendship = Friendship.query.filter_by(user_id=friend.id, friend_id=request.current_user.id).first()
-        if not friendship or friendship.status != 'pending':
-            return jsonify({'error': 'Friend request not found'}), 404
-        if action == 'accept':
-            friendship.status = 'accepted'
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Friend request accepted'}), 200
-        else:
-            db.session.delete(friendship)
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Friend request declined'}), 200
-    except Exception as e:
-        logger.error(f"Respond friend request error: {e}")
-        db.session.rollback()
-        return jsonify({'error': 'Failed to process friend request'}), 500
 
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
@@ -401,14 +353,13 @@ def player_ready():
             return jsonify({'error': 'Room not found'}), 404
         player = session_data['player']
         player.is_ready = True
-        broadcast_event(room_id, 'player_ready', {'seat': seat, 'player_name': player.name, 'ready': True})
+        broadcast_event(room_id, 'player_ready', {'seat': seat, 'player_name': player.name, 'ready': True, 'players': room.get_players_info()})
         if room.all_ready():
             if room.start_game():
                 broadcast_event(room_id, 'game_started', {
                     'dealer': room.game.dealer,
                     'round_number': room.round_count,
                 })
-                # FIX: send cards to each player
                 for s in range(4):
                     if room.players[s]:
                         broadcast_event(room_id,'cards_dealt',{
@@ -419,6 +370,35 @@ def player_ready():
     except Exception as e:
         logger.error(f"Ready error: {e}")
         return jsonify({'error': 'Failed to set ready status'}), 500
+
+@app.route('/api/chat', methods=['POST'])
+@login_required
+def send_chat_message():
+    try:
+        data = request.get_json(force=True)
+        session_id = data.get('session_id')
+        message = (data.get('message') or '').strip()
+        
+        if not message:
+            return jsonify({'error': 'Message required'}), 400
+            
+        if not session_id or session_id not in player_sessions:
+            return jsonify({'error': 'Invalid session'}), 400
+            
+        session_data = player_sessions[session_id]
+        room_id = session_data['room_id']
+        player_name = session_data['player'].name
+        
+        broadcast_event(room_id, 'chat_message', {
+            'author': player_name,
+            'message': message,
+            'timestamp': time.time()
+        })
+        
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        return jsonify({'error': 'Failed to send message'}), 500
 
 @app.route('/api/poll', methods=['GET'])
 @login_required
@@ -444,36 +424,6 @@ def poll_events():
     except Exception as e:
         logger.error(f"Poll error: {e}")
         return jsonify({'error': 'Failed to poll events'}), 500
-
-@app.route('/api/reconnect', methods=['POST'])
-@login_required
-def reconnect_session():
-    try:
-        data = request.get_json(force=True)
-        session_id = data.get('session_id')
-        if not session_id or session_id not in player_sessions:
-            return jsonify({'error': 'Invalid session'}), 400
-        session_data = player_sessions[session_id]
-        room_id = session_data['room_id']
-        seat = session_data['seat']
-        room = rooms.get(room_id)
-        if not room:
-            return jsonify({'error': 'Room not found'}), 404
-        player = session_data['player']
-        player.is_connected = True
-        broadcast_event(room_id, 'player_reconnected', {'seat': seat, 'player_name': player.name})
-        return jsonify({'success': True, 'seat': seat}), 200
-    except Exception as e:
-        logger.error(f"Reconnect error: {e}")
-        return jsonify({'error': 'Failed to reconnect'}), 500
-
-@app.route('/api/rooms/<room_id>', methods=['GET'])
-@login_required
-def get_room_state(room_id):
-    room = rooms.get(room_id)
-    if not room:
-        return jsonify({'error': 'Room not found'}), 404
-    return jsonify(room.get_state()), 200
 
 @app.route('/api/play_card', methods=['POST'])
 def play_card_enhanced():
@@ -547,6 +497,7 @@ def health():
 
 def handle_round_end(room: Room, room_id: str) -> None:
     final_scores = room.game.calculate_final_scores()
+    
     if final_scores['team_a'] > final_scores['team_b']:
         round_winner = 'Team A'
         winning_score = final_scores['team_a']
@@ -556,8 +507,10 @@ def handle_round_end(room: Room, room_id: str) -> None:
     else:
         round_winner = 'Tie'
         winning_score = final_scores['team_a']
+    
     room.total_scores['team_a'] += final_scores['team_a']
     room.total_scores['team_b'] += final_scores['team_b']
+    
     broadcast_event(room_id, 'round_complete', {
         'round_winner': round_winner,
         'winning_score': winning_score,
@@ -565,23 +518,58 @@ def handle_round_end(room: Room, room_id: str) -> None:
         'total_scores': room.total_scores,
         'round_number': room.round_count,
     })
+    
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
-        broadcast_event(room_id, 'game_complete', {'game_winner': game_winner, 'final_total_scores': room.total_scores})
+        broadcast_event(room_id, 'game_complete', {
+            'game_winner': game_winner, 
+            'final_total_scores': room.total_scores
+        })
         room.game_state = GameState.FINISHED
+        update_player_stats(room, game_winner)
     else:
         start_new_round(room, room_id)
-
+def update_player_stats(room: Room, game_winner: str) -> None:
+    """Update player statistics in database after game completes"""
+    try:
+        winning_team_seats = [0, 2] if game_winner == 'Team A' else [1, 3]
+        
+        for seat, player in room.players.items():
+            if player and player.user_id:
+                user = User.query.get(player.user_id)
+                if user:
+                    user.games_played += 1
+                    if seat in winning_team_seats:
+                        user.games_won += 1
+                    user.win_rate = (user.games_won / user.games_played * 100) if user.games_played > 0 else 0
+                    
+                    xp_gained = 100 if seat in winning_team_seats else 50
+                    user.experience += xp_gained
+                    
+                    new_level = (user.experience // 500) + 1
+                    if new_level > user.level:
+                        user.level = new_level
+                    team_key = 'team_a' if seat in [0, 2] else 'team_b'
+                    user.total_points += room.total_scores[team_key]
+        
+        db.session.commit()
+        logger.info(f"Updated stats for game in room {room.room_id}")
+    except Exception as e:
+        logger.error(f"Error updating player stats: {e}")
+        db.session.rollback()
 def start_new_round(room: Room, room_id: str) -> None:
+    """Prepare for next round - reset ready status and game"""
     for p in room.players.values():
         if p:
             p.is_ready = False
+    
     room.game_state = GameState.READY
     room.game = None
+    
     broadcast_event(room_id, 'new_round_ready', {
         'round_number': room.round_count + 1,
         'total_scores': room.total_scores,
-        'message': 'Ready up for next round!'
+        'message': f'Round {room.round_count} complete! Ready up for Round {room.round_count + 1}!'
     })
 
 @app.errorhandler(404)

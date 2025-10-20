@@ -10,6 +10,7 @@
     .auth-container { min-height: 100vh; display:flex; align-items:center; justify-content:center; padding:20px; background: linear-gradient(135deg,#1e3a8a 0%, #7c3aed 100%); }
     .auth-card { background: rgba(15,23,42,.95); border-radius:20px; padding:40px; width:100%; max-width:450px; backdrop-filter:blur(20px); border:1px solid rgba(148,163,184,.1); box-shadow:0 25px 50px -12px rgba(0,0,0,.5); }
     .auth-header { text-align:center; margin-bottom:30px; }
+    
     .auth-header h1 { font-size:3rem; background:linear-gradient(135deg,#3b82f6,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px; }
     .auth-header p { color:#94a3b8; font-size:1.1rem; }
     .auth-form { display:flex; flex-direction:column; gap:20px; }
@@ -94,6 +95,7 @@
     @media (max-width:768px){ .auth-card{ padding:30px 20px; } .container{ padding:10px; } .game-table{ padding:20px; } .card{ padding:10px 15px; font-size:1.1rem; } }
   </style>
 </head>
+  
 <body>
   <div id="authScreen" class="auth-container">
     <div class="auth-card">
@@ -139,16 +141,16 @@
   <div id="gameApp" class="game-app">
     <div class="container">
       <nav class="navbar">
-        <div class="nav-brand"><h2>🎯 Baloot</h2></div>
-        <div class="nav-user">
-          <div class="user-info">
-            <div class="user-avatar" id="userAvatar">U</div>
-            <div class="user-details">
-              <div class="user-name" id="userName">Username</div>
-              <div class="user-level" id="userLevel">Level 1 • 0 XP</div>
-            </div>
+      <div class="nav-brand"><h2>🎯 Baloot</h2></div>
+    <div class="nav-user">
+      <div class="user-info">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <div class="user-details">
+            <div class="user-name" id="userName">Username</div>
+        <div class="user-level" id="userLevel">Level 1 • 0 XP</div>
           </div>
-          <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+        </div>
+      <button class="btn btn-secondary" id="logoutBtn">Logout</button>
         </div>
       </nav>
 

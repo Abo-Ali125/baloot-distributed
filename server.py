@@ -128,6 +128,7 @@ def get_or_create_room(room_id: str) -> Room:
 def broadcast_event(room_id: str, event_type: str, data: dict) -> None:
     if room_id in events_queue:
         event = {'type': event_type, 'data': data, 'timestamp': time.time()}
+        
         events_queue[room_id].append(event)
         logger.info(f"Event: {event_type} in room {room_id}")
 
@@ -172,9 +173,13 @@ def register():
         )
         db.session.add(user)
         db.session.commit()
+        
         auth_token = create_session_token()
+        
         user_sessions[auth_token] = {'user': user, 'created_at': datetime.utcnow(), 'last_activity': datetime.utcnow()}
+        
         session['auth_token'] = auth_token
+        
         session.permanent = True
         return jsonify({'success': True, 'auth_token': auth_token, 'user': user.to_dict()}), 201
     except Exception as e:
@@ -198,6 +203,8 @@ def login():
         session['auth_token'] = auth_token
         session.permanent = True
         return jsonify({'success': True, 'auth_token': auth_token, 'user': user.to_dict()}), 200
+
+    
     except Exception as e:
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
@@ -207,6 +214,8 @@ def login():
 def logout():
     auth_token = request.headers.get('Authorization') or session.get('auth_token')
     if auth_token in user_sessions:
+
+        
         del user_sessions[auth_token]
     session.clear()
     return jsonify({'success': True}), 200
@@ -229,6 +238,7 @@ def update_profile():
         if 'avatar_url' in data:
             user.avatar_url = (data['avatar_url'] or '')[:200]
         db.session.commit()
+        
         return jsonify(user.to_dict()), 200
     except Exception as e:
         logger.error(f"Profile update error: {e}")
@@ -247,6 +257,7 @@ def get_leaderboard():
         'games_won': p.games_won,
         'win_rate': p.win_rate,
         'total_points': p.total_points,
+        
     } for i, p in enumerate(top_players)]), 200
 
 @app.route('/api/friends', methods=['GET'])

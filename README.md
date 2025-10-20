@@ -40,7 +40,13 @@ Team A: Players in seats 1 & 3
 Team B: Players in seats 2 & 4
 
 Card Values
-CardPointsAce111010King4Queen3Jack29,8,70
+CardPoints: 
+Ace = 11
+10 = 10
+King = 4
+Queen = 3
+Jack = 2
+9,8,7 = 0
 How to Play
 
 Each player receives 8 cards

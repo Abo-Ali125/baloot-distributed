@@ -1,6 +1,6 @@
 🎯 Baloot - Traditional Saudi Card Game
 A real-time multiplayer implementation of Baloot, a traditional Saudi Arabian card game similar to Bridge. Built as a distributed systems project demonstrating client-server architecture, real-time state synchronization, and persistent user management.
-🌟 Features
+
 
 🎮 Gameplay
 

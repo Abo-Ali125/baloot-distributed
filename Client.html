@@ -174,6 +174,70 @@
             <div class="friends-list" id="friendsList"></div>
           </div>
         </aside>
+        // Store session info in localStorage for reconnection
+function saveSessionInfo(sessionId, roomId, seat) {
+  localStorage.setItem('gameSession', JSON.stringify({
+    sessionId,
+    roomId,
+    seat,
+    timestamp: Date.now()
+  }));
+}
+
+// Check for existing session on load
+async function checkForReconnection() {
+  const saved = localStorage.getItem('gameSession');
+  if (!saved) return false;
+  
+  try {
+    const { sessionId, roomId, seat, timestamp } = JSON.parse(saved);
+    // Only try to reconnect if session is less than 30 minutes old
+    if (Date.now() - timestamp > 30 * 60 * 1000) {
+      localStorage.removeItem('gameSession');
+      return false;
+    }
+    
+    const shouldReconnect = confirm(`You have an active game in room "${roomId}". Reconnect?`);
+    if (!shouldReconnect) {
+      localStorage.removeItem('gameSession');
+      return false;
+    }
+    
+    // Attempt reconnection
+    const data = await api.json('/api/reconnect', {
+      method: 'POST',
+      headers: { 'Authorization': authToken },
+      body: JSON.stringify({ session_id: sessionId, room_id: roomId })
+    });
+    
+    // Restore state
+    sessionId = data.session_id;
+    currentRoomId = data.room_state.room_id;
+    playerSeat = data.seat;
+    lastTimestamp = 0;
+    
+    document.getElementById('currentRoom').textContent = currentRoomId;
+    document.getElementById('yourSeat').textContent = playerSeat + 1;
+    document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
+    
+    updatePlayers(data.players);
+    if (data.hand) renderHand(data.hand);
+    if (data.team_scores) updateScores(data.team_scores);
+    if (data.current_trick) updateTrickArea(data);
+    
+    saveSessionInfo(sessionId, currentRoomId, playerSeat);
+    startPolling();
+    
+    showNotification('Reconnected successfully!', 'success');
+    return true;
+    
+  } catch (e) {
+    console.error('Reconnection failed:', e);
+    localStorage.removeItem('gameSession');
+    showNotification('Could not reconnect to game', 'error');
+    return false;
+  }
+}
 
         <main>
           <div class="panel">

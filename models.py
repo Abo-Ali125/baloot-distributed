@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Dict, Optional
@@ -7,15 +8,7 @@ class GameState(Enum):
     READY = 'READY'
     IN_PROGRESS = 'IN_PROGRESS'
     FINISHED = 'FINISHED'
-    
-last_activity: float = field(default_factory=time.time)
 
-def update_activity(self):
-    self.last_activity = time.time()
-
-def is_disconnected(self, timeout: int = 60) -> bool:
-    """Check if player hasn't been active for timeout seconds"""
-    return time.time() - self.last_activity > timeout
 @dataclass
 class Player:
     session_id: str
@@ -23,6 +16,14 @@ class Player:
     is_ready: bool = False
     is_connected: bool = True
     user_id: Optional[int] = None
+    last_activity: float = field(default_factory=time.time)
+
+    def update_activity(self):
+        self.last_activity = time.time()
+
+    def is_disconnected(self, timeout: int = 60) -> bool:
+        """Check if player hasn't been active for timeout seconds"""
+        return time.time() - self.last_activity > timeout
 
 @dataclass
 class Room:
@@ -56,7 +57,7 @@ class Room:
     def start_game(self) -> bool:
         if not self.all_ready():
             return False
-        from game import Game  # local import to avoid cycles
+        from game import Game
         self.game = Game()
         self.game_state = GameState.IN_PROGRESS
         self.round_count += 1

@@ -7,7 +7,15 @@ class GameState(Enum):
     READY = 'READY'
     IN_PROGRESS = 'IN_PROGRESS'
     FINISHED = 'FINISHED'
+    
+last_activity: float = field(default_factory=time.time)
 
+def update_activity(self):
+    self.last_activity = time.time()
+
+def is_disconnected(self, timeout: int = 60) -> bool:
+    """Check if player hasn't been active for timeout seconds"""
+    return time.time() - self.last_activity > timeout
 @dataclass
 class Player:
     session_id: str

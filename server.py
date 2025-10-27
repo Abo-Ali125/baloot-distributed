@@ -10,7 +10,7 @@ import secrets
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from flask import Flask, request, jsonify, session, render_template_string
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -57,7 +57,7 @@ MAX_PLAYERS_PER_ROOM = 4
 MAX_EVENTS_PER_ROOM = 100
 PORT = int(os.environ.get('PORT', 10000))
 
-# Database Models                                                                                                                                                                                                                                                                                                                              HH
+# Database Models
 class User(db.Model):
     """User account model"""
     id = db.Column(db.Integer, primary_key=True)
@@ -128,7 +128,6 @@ def get_or_create_room(room_id: str) -> Room:
 def broadcast_event(room_id: str, event_type: str, data: dict) -> None:
     if room_id in events_queue:
         event = {'type': event_type, 'data': data, 'timestamp': time.time()}
-        
         events_queue[room_id].append(event)
         logger.info(f"Event: {event_type} in room {room_id}")
 
@@ -138,7 +137,7 @@ def index():
     """Serve the main game client"""
     try:
         current_dir = Path(__file__).parent
-        for candidate in ('Client(1).html','Client.html', 'client.html', 'index.html'):
+        for candidate in ('Client.html', 'client.html', 'index.html'):
             client_path = current_dir / candidate
             if client_path.exists():
                 return client_path.read_text(encoding='utf-8')
@@ -173,13 +172,9 @@ def register():
         )
         db.session.add(user)
         db.session.commit()
-        
         auth_token = create_session_token()
-        
         user_sessions[auth_token] = {'user': user, 'created_at': datetime.utcnow(), 'last_activity': datetime.utcnow()}
-        
         session['auth_token'] = auth_token
-        
         session.permanent = True
         return jsonify({'success': True, 'auth_token': auth_token, 'user': user.to_dict()}), 201
     except Exception as e:
@@ -203,8 +198,6 @@ def login():
         session['auth_token'] = auth_token
         session.permanent = True
         return jsonify({'success': True, 'auth_token': auth_token, 'user': user.to_dict()}), 200
-
-    
     except Exception as e:
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
@@ -214,8 +207,6 @@ def login():
 def logout():
     auth_token = request.headers.get('Authorization') or session.get('auth_token')
     if auth_token in user_sessions:
-
-        
         del user_sessions[auth_token]
     session.clear()
     return jsonify({'success': True}), 200
@@ -238,7 +229,6 @@ def update_profile():
         if 'avatar_url' in data:
             user.avatar_url = (data['avatar_url'] or '')[:200]
         db.session.commit()
-        
         return jsonify(user.to_dict()), 200
     except Exception as e:
         logger.error(f"Profile update error: {e}")
@@ -257,7 +247,6 @@ def get_leaderboard():
         'games_won': p.games_won,
         'win_rate': p.win_rate,
         'total_points': p.total_points,
-        
     } for i, p in enumerate(top_players)]), 200
 
 @app.route('/api/friends', methods=['GET'])
@@ -307,11 +296,94 @@ def add_friend():
         db.session.add(friendship)
         db.session.commit()
         return jsonify({'success': True}), 200
-        
     except Exception as e:
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
+
+@app.route('/api/reconnect', methods=['POST'])
+@login_required
+def reconnect():
+    try:
+        data = request.get_json(force=True)
+        old_session_id = data.get('session_id')
+        room_id = data.get('room_id')
+        if not room_id or room_id not in rooms:
+            return jsonify({'error': 'Room not found'}), 404
+        room = rooms[room_id]
+        seat = None
+        if old_session_id and old_session_id in player_sessions:
+            seat = player_sessions[old_session_id]['seat']
+        else:
+            for s, player in room.players.items():
+                if player and player.user_id == request.current_user.id:
+                    seat = s
+                    break
+        if seat is None:
+            return jsonify({'error': 'No seat found in this room'}), 404
+        new_session_id = str(uuid.uuid4())
+        player = room.players[seat]
+        player.is_connected = True
+        player.session_id = new_session_id
+        if old_session_id in player_sessions:
+            del player_sessions[old_session_id]
+        player_sessions[new_session_id] = {
+            'player': player,
+            'room_id': room_id,
+            'seat': seat,
+            'user_id': request.current_user.id
+        }
+        game_state = {
+            'session_id': new_session_id,
+            'seat': seat,
+            'room_state': room.get_state(),
+            'players': room.get_players_info(),
+        }
+        if room.game:
+            game_state.update({
+                'hand': room.game.hands[seat],
+                'current_trick': [{'seat': s, 'card': c} for s, c in room.game.current_trick],
+                'current_player': room.game.current_player,
+                'trick_count': room.game.trick_count,
+                'team_scores': room.game.team_scores,
+            })
+        broadcast_event(room_id, 'player_reconnected', {'player_name': player.name, 'seat': seat})
+        return jsonify(game_state), 200
+    except Exception as e:
+        logger.error(f"Reconnect error: {e}")
+        return jsonify({'error': 'Reconnection failed'}), 500
+
+@app.route('/api/leave', methods=['POST'])
+@login_required
+def leave_room():
+    try:
+        data = request.get_json(force=True)
+        session_id = data.get('session_id')
+        if not session_id or session_id not in player_sessions:
+            return jsonify({'error': 'Invalid session'}), 400
+        session_data = player_sessions[session_id]
+        room_id = session_data['room_id']
+        seat = session_data['seat']
+        room = rooms.get(room_id)
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+        player_name = session_data['player'].name
+        room.remove_player(session_id)
+        del player_sessions[session_id]
+        broadcast_event(room_id, 'player_left', {
+            'player_name': player_name,
+            'seat': seat,
+            'players': room.get_players_info()
+        })
+        if all(p is None for p in room.players.values()):
+            del rooms[room_id]
+            if room_id in events_queue:
+                del events_queue[room_id]
+            logger.info(f"Removed empty room: {room_id}")
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Leave room error: {e}")
+        return jsonify({'error': 'Failed to leave room'}), 500
 
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
@@ -342,7 +414,8 @@ def join_room():
         seat = room.add_player(player)
         if seat is None:
             return jsonify({'error': 'Could not join room'}), 400
-        player_sessions[session_id] = {'player': player, 'room_id': room_id, 'seat': seat, 'user_id': request.current_user.id}
+        player_sessions[session_id] = {'player': player, 'room_id': room_id, 'seat': seat,
+        'user_id': request.current_user.id}
         broadcast_event(room_id, 'player_joined', {'player_name': player.name, 'seat': seat, 'players': room.get_players_info()})
         return jsonify({'session_id': session_id, 'seat': seat, 'room_state': room.get_state(), 'players': room.get_players_info()}), 200
     except Exception as e:
@@ -390,23 +463,18 @@ def send_chat_message():
         data = request.get_json(force=True)
         session_id = data.get('session_id')
         message = (data.get('message') or '').strip()
-        
         if not message:
             return jsonify({'error': 'Message required'}), 400
-            
         if not session_id or session_id not in player_sessions:
             return jsonify({'error': 'Invalid session'}), 400
-            
         session_data = player_sessions[session_id]
         room_id = session_data['room_id']
         player_name = session_data['player'].name
-        
         broadcast_event(room_id, 'chat_message', {
             'author': player_name,
             'message': message,
             'timestamp': time.time()
         })
-        
         return jsonify({'success': True}), 200
     except Exception as e:
         logger.error(f"Chat error: {e}")
@@ -510,7 +578,6 @@ def health():
 
 def handle_round_end(room: Room, room_id: str) -> None:
     final_scores = room.game.calculate_final_scores()
-    
     if final_scores['team_a'] > final_scores['team_b']:
         round_winner = 'Team A'
         winning_score = final_scores['team_a']
@@ -520,10 +587,8 @@ def handle_round_end(room: Room, room_id: str) -> None:
     else:
         round_winner = 'Tie'
         winning_score = final_scores['team_a']
-    
     room.total_scores['team_a'] += final_scores['team_a']
     room.total_scores['team_b'] += final_scores['team_b']
-    
     broadcast_event(room_id, 'round_complete', {
         'round_winner': round_winner,
         'winning_score': winning_score,
@@ -531,7 +596,6 @@ def handle_round_end(room: Room, room_id: str) -> None:
         'total_scores': room.total_scores,
         'round_number': room.round_count,
     })
-    
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         broadcast_event(room_id, 'game_complete', {
@@ -542,11 +606,11 @@ def handle_round_end(room: Room, room_id: str) -> None:
         update_player_stats(room, game_winner)
     else:
         start_new_round(room, room_id)
+
 def update_player_stats(room: Room, game_winner: str) -> None:
     """Update player statistics in database after game completes"""
     try:
         winning_team_seats = [0, 2] if game_winner == 'Team A' else [1, 3]
-        
         for seat, player in room.players.items():
             if player and player.user_id:
                 user = User.query.get(player.user_id)
@@ -555,30 +619,26 @@ def update_player_stats(room: Room, game_winner: str) -> None:
                     if seat in winning_team_seats:
                         user.games_won += 1
                     user.win_rate = (user.games_won / user.games_played * 100) if user.games_played > 0 else 0
-                    
                     xp_gained = 100 if seat in winning_team_seats else 50
                     user.experience += xp_gained
-                    
                     new_level = (user.experience // 500) + 1
                     if new_level > user.level:
                         user.level = new_level
                     team_key = 'team_a' if seat in [0, 2] else 'team_b'
                     user.total_points += room.total_scores[team_key]
-        
         db.session.commit()
         logger.info(f"Updated stats for game in room {room.room_id}")
     except Exception as e:
         logger.error(f"Error updating player stats: {e}")
         db.session.rollback()
+
 def start_new_round(room: Room, room_id: str) -> None:
     """Prepare for next round - reset ready status and game"""
     for p in room.players.values():
         if p:
             p.is_ready = False
-    
     room.game_state = GameState.READY
     room.game = None
-    
     broadcast_event(room_id, 'new_round_ready', {
         'round_number': room.round_count + 1,
         'total_scores': room.total_scores,
@@ -612,57 +672,3 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)
-
-
-@app.route('/api/reconnect', methods=['POST'])
-@login_required
-def reconnect():
-    try:
-        data = request.get_json(force=True)
-        old_session_id = data.get('session_id')
-        room_id = data.get('room_id')
-        if not room_id or room_id not in rooms:
-            return jsonify({'error': 'Room not found'}), 404
-        room = rooms[room_id]
-        seat = None
-        if old_session_id and old_session_id in player_sessions:
-            seat = player_sessions[old_session_id]['seat']
-        else:
-            for s, player in room.players.items():
-                if player and player.user_id == request.current_user.id:
-                    seat = s
-                    break
-        if seat is None:
-            return jsonify({'error': 'No seat found in this room'}), 404
-        new_session_id = str(uuid.uuid4())
-        player = room.players[seat]
-        player.is_connected = True
-        player.session_id = new_session_id
-        if old_session_id in player_sessions:
-            del player_sessions[old_session_id]
-        player_sessions[new_session_id] = {
-            'player': player,
-            'room_id': room_id,
-            'seat': seat,
-            'user_id': request.current_user.id
-        }
-        game_state = {
-            'session_id': new_session_id,
-            'seat': seat,
-            'room_state': room.get_state(),
-            'players': room.get_players_info(),
-        }
-        if room.game:
-            game_state.update({
-                'hand': room.game.hands[seat],
-                'current_trick': [{'seat': s, 'card': c} for s, c in room.game.current_trick],
-                'current_player': room.game.current_player,
-                'trick_count': room.game.trick_count,
-                'team_scores': room.game.team_scores,
-            })
-        broadcast_event(room_id, 'player_reconnected', {'player_name': player.name, 'seat': seat})
-        return jsonify(game_state), 200
-    except Exception as e:
-        logger.error(f"Reconnect error: {e}")
-        return jsonify({'error': 'Reconnection failed'}), 500
-

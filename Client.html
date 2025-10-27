@@ -238,7 +238,26 @@ async function checkForReconnection() {
     return false;
   }
 }
-
+async function joinRoom(roomId){
+  try {
+    const data = await api.json('/api/join', { method:'POST', headers:{ 'Authorization': authToken }, body: JSON.stringify({ room_id: roomId })});
+    sessionId = data.session_id; 
+    currentRoomId = roomId; 
+    playerSeat = data.seat; 
+    lastTimestamp = 0;
+    
+    // Save for reconnection
+    saveSessionInfo(sessionId, roomId, playerSeat);
+    
+    document.getElementById('currentRoom').textContent = roomId;
+    document.getElementById('yourSeat').textContent = playerSeat + 1;
+    document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
+    updatePlayers(data.players);
+    startPolling();
+    showNotification(`Joined room: ${roomId}`, 'success');
+  } catch (e){ showNotification(e.message || 'Failed to join room','error'); }
+}
+        
         <main>
           <div class="panel">
             <h3>🎮 Game Table</h3>
@@ -384,6 +403,17 @@ async function checkForReconnection() {
       } catch (err) { showNotification(err.message || 'Registration failed', 'error'); }
     });
 
+    async function init(){
+  if (authToken) {
+    const ok = await loadProfile();
+    if (ok) {
+      await showGameApp();
+      // Check for reconnection after showing game app
+      await checkForReconnection();
+    }
+  }
+  setInterval(() => { if (currentUser && !currentRoomId) loadRooms(); }, 10000);
+}
     logoutBtn.onclick = async () => {
       try { await fetch('/api/logout', { method:'POST', headers:{ 'Authorization': authToken } }); } catch {}
       localStorage.removeItem('authToken'); location.reload();

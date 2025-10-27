@@ -57,7 +57,7 @@ MAX_PLAYERS_PER_ROOM = 4
 MAX_EVENTS_PER_ROOM = 100
 PORT = int(os.environ.get('PORT', 10000))
 
-# Database Models
+# Database Models                                                                                                                                                                                                                                                                                                                              HH
 class User(db.Model):
     """User account model"""
     id = db.Column(db.Integer, primary_key=True)
@@ -138,7 +138,7 @@ def index():
     """Serve the main game client"""
     try:
         current_dir = Path(__file__).parent
-        for candidate in ('Client.html', 'client.html', 'index.html'):
+        for candidate in ('Client(1).html','Client.html', 'client.html', 'index.html'):
             client_path = current_dir / candidate
             if client_path.exists():
                 return client_path.read_text(encoding='utf-8')
@@ -312,81 +312,6 @@ def add_friend():
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
-        @app.route('/api/reconnect', methods=['POST'])
-        
-@login_required
-def reconnect():
-    try:
-        data = request.get_json(force=True)
-        old_session_id = data.get('session_id')
-        room_id = data.get('room_id')
-        
-        if not room_id or room_id not in rooms:
-            return jsonify({'error': 'Room not found'}), 404
-            
-        room = rooms[room_id]
-        
-        # Find player's seat from old session or user_id
-        seat = None
-        if old_session_id and old_session_id in player_sessions:
-            seat = player_sessions[old_session_id]['seat']
-        else:
-            # Search by user_id
-            for s, player in room.players.items():
-                if player and player.user_id == request.current_user.id:
-                    seat = s
-                    break
-        
-        if seat is None:
-            return jsonify({'error': 'No seat found in this room'}), 404
-            
-        # Create new session for reconnection
-        new_session_id = str(uuid.uuid4())
-        player = room.players[seat]
-        player.is_connected = True
-        player.session_id = new_session_id
-        
-        # Update session mapping
-        if old_session_id in player_sessions:
-            del player_sessions[old_session_id]
-        
-        player_sessions[new_session_id] = {
-            'player': player,
-            'room_id': room_id,
-            'seat': seat,
-            'user_id': request.current_user.id
-        }
-        
-        # Get current game state
-        game_state = {
-            'session_id': new_session_id,
-            'seat': seat,
-            'room_state': room.get_state(),
-            'players': room.get_players_info(),
-        }
-        
-        if room.game:
-            game_state.update({
-                'hand': room.game.hands[seat],
-                'current_trick': [{
-                    'seat': s,
-                    'card': c
-                } for s, c in room.game.current_trick],
-                'current_player': room.game.current_player,
-                'trick_count': room.game.trick_count,
-                'team_scores': room.game.team_scores,
-            })
-        
-        broadcast_event(room_id, 'player_reconnected', {
-            'player_name': player.name,
-            'seat': seat
-        })
-        
-        return jsonify(game_state), 200
-        
-    except Exception as e:
-        logger.error(f"Reconnect error: {e}")
-        return jsonify({'error': 'Reconnection failed'}), 500
 
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
@@ -513,6 +438,7 @@ def poll_events():
         return jsonify({'error': 'Failed to poll events'}), 500
 
 @app.route('/api/play_card', methods=['POST'])
+@login_required
 def play_card_enhanced():
     try:
         data = request.get_json(force=True)
@@ -686,3 +612,57 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
+
+@app.route('/api/reconnect', methods=['POST'])
+@login_required
+def reconnect():
+    try:
+        data = request.get_json(force=True)
+        old_session_id = data.get('session_id')
+        room_id = data.get('room_id')
+        if not room_id or room_id not in rooms:
+            return jsonify({'error': 'Room not found'}), 404
+        room = rooms[room_id]
+        seat = None
+        if old_session_id and old_session_id in player_sessions:
+            seat = player_sessions[old_session_id]['seat']
+        else:
+            for s, player in room.players.items():
+                if player and player.user_id == request.current_user.id:
+                    seat = s
+                    break
+        if seat is None:
+            return jsonify({'error': 'No seat found in this room'}), 404
+        new_session_id = str(uuid.uuid4())
+        player = room.players[seat]
+        player.is_connected = True
+        player.session_id = new_session_id
+        if old_session_id in player_sessions:
+            del player_sessions[old_session_id]
+        player_sessions[new_session_id] = {
+            'player': player,
+            'room_id': room_id,
+            'seat': seat,
+            'user_id': request.current_user.id
+        }
+        game_state = {
+            'session_id': new_session_id,
+            'seat': seat,
+            'room_state': room.get_state(),
+            'players': room.get_players_info(),
+        }
+        if room.game:
+            game_state.update({
+                'hand': room.game.hands[seat],
+                'current_trick': [{'seat': s, 'card': c} for s, c in room.game.current_trick],
+                'current_player': room.game.current_player,
+                'trick_count': room.game.trick_count,
+                'team_scores': room.game.team_scores,
+            })
+        broadcast_event(room_id, 'player_reconnected', {'player_name': player.name, 'seat': seat})
+        return jsonify(game_state), 200
+    except Exception as e:
+        logger.error(f"Reconnect error: {e}")
+        return jsonify({'error': 'Reconnection failed'}), 500
+

@@ -10,12 +10,10 @@
     .auth-container { min-height: 100vh; display:flex; align-items:center; justify-content:center; padding:20px; background: linear-gradient(135deg,#1e3a8a 0%, #7c3aed 100%); }
     .auth-card { background: rgba(15,23,42,.95); border-radius:20px; padding:40px; width:100%; max-width:450px; backdrop-filter:blur(20px); border:1px solid rgba(148,163,184,.1); box-shadow:0 25px 50px -12px rgba(0,0,0,.5); }
     .auth-header { text-align:center; margin-bottom:30px; }
-    
     .auth-header h1 { font-size:3rem; background:linear-gradient(135deg,#3b82f6,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px; }
     .auth-header p { color:#94a3b8; font-size:1.1rem; }
     .auth-form { display:flex; flex-direction:column; gap:20px; }
     .form-group { display:flex; flex-direction:column; gap:8px; }
-  
     .form-group label { color:#cbd5e1; font-weight:500; font-size:.95rem; }
     .form-group input { padding:12px 16px; border:1px solid rgba(148,163,184,.2); border-radius:10px; background:rgba(30,41,59,.8); color:#e2e8f0; font-size:1rem; transition:all .3s ease; }
     .form-group input:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
@@ -24,6 +22,8 @@
     .btn-primary:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 8px 25px rgba(59,130,246,.4); }
     .btn-secondary { background:transparent; color:#3b82f6; border:1px solid rgba(59,130,246,.5); }
     .btn-secondary:hover { background:rgba(59,130,246,.1); }
+    .btn-danger { background:linear-gradient(135deg,#ef4444,#dc2626); color:white; }
+    .btn-danger:hover { transform:translateY(-2px); box-shadow:0 8px 25px rgba(239,68,68,.4); }
     .auth-switch { text-align:center; margin-top:20px; color:#94a3b8; }
     .auth-switch a { color:#3b82f6; text-decoration:none; font-weight:600; cursor:pointer; }
     .auth-switch a:hover { text-decoration:underline; }
@@ -89,13 +89,10 @@
     .notification.success{ border-color:rgba(16,185,129,.5); background:rgba(16,185,129,.1); }
     .notification.error{ border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.1); }
     .notification.info{ border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.1); }
-    .loading-spinner{ width:50px; height:50px; border:3px solid rgba(59,130,246,.3); border-radius:50%; border-top-color:#3b82f6; animation:spin 1s ease-in-out infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
     @media (max-width:1200px){ .main-content{ grid-template-columns:1fr; } .sidebar{ display:none; } }
     @media (max-width:768px){ .auth-card{ padding:30px 20px; } .container{ padding:10px; } .game-table{ padding:20px; } .card{ padding:10px 15px; font-size:1.1rem; } }
   </style>
 </head>
-  
 <body>
   <div id="authScreen" class="auth-container">
     <div class="auth-card">
@@ -141,16 +138,16 @@
   <div id="gameApp" class="game-app">
     <div class="container">
       <nav class="navbar">
-      <div class="nav-brand"><h2>🎯 Baloot</h2></div>
-    <div class="nav-user">
-      <div class="user-info">
-          <div class="user-avatar" id="userAvatar">U</div>
-          <div class="user-details">
-            <div class="user-name" id="userName">Username</div>
-        <div class="user-level" id="userLevel">Level 1 • 0 XP</div>
+        <div class="nav-brand"><h2>🎯 Baloot</h2></div>
+        <div class="nav-user">
+          <div class="user-info">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div class="user-details">
+              <div class="user-name" id="userName">Username</div>
+              <div class="user-level" id="userLevel">Level 1 • 0 XP</div>
+            </div>
           </div>
-        </div>
-      <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+          <button class="btn btn-secondary" id="logoutBtn">Logout</button>
         </div>
       </nav>
 
@@ -174,6 +171,7 @@
             <div class="friends-list" id="friendsList"></div>
           </div>
         </aside>
+
         <main>
           <div class="panel">
             <h3>🎮 Game Table</h3>
@@ -222,6 +220,7 @@
               <p><strong>Round:</strong> <span id="roundNumber">-</span></p>
             </div>
             <button class="btn btn-primary" id="readyBtn" style="width:100%; margin-top:10px;">Ready to Play</button>
+            <button class="btn btn-danger" id="leaveRoomBtn" style="width:100%; margin-top:10px; display:none;">Leave Room</button>
           </div>
 
           <div class="panel" style="margin-top:20px;">
@@ -247,10 +246,7 @@
   <script>
     const api = {
       async json(url, opts = {}) {
-        const res = await fetch(url, {
-          ...opts,
-          headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) }
-        });
+        const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
         const ct = res.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
           const text = await res.text();
@@ -262,7 +258,17 @@
       },
     };
 
-    // session persistence + reconnection
+    function showNotification(message, type = 'info') {
+      const n = document.createElement('div');
+      n.className = `notification ${type}`;
+      n.textContent = message;
+      document.body.appendChild(n);
+      setTimeout(() => { n.style.animation = 'slideIn .3s ease reverse'; setTimeout(() => n.remove(), 300); }, 3000);
+    }
+
+    function formatCard(card){ const s = card.slice(-1), r = card.slice(0,-1); const m={H:'♥️',D:'♦️',C:'♣️',S:'♠️'}; return r + m[s]; }
+    function getCardClass(card){ const s = card.slice(-1); return s==='H'||s==='D' ? 'hearts' : (s==='S'?'spades':'clubs'); }
+
     function saveSessionInfo(sessionId, roomId, seat) {
       localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
     }
@@ -293,6 +299,7 @@
         document.getElementById('currentRoom').textContent = currentRoomId;
         document.getElementById('yourSeat').textContent = playerSeat + 1;
         document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
+        document.getElementById('leaveRoomBtn').style.display = 'block';
         updatePlayers(data.players);
         if (data.hand) renderHand(data.hand);
         if (data.team_scores) updateScores(data.team_scores);
@@ -308,18 +315,6 @@
         return false;
       }
     }
-
-
-    function showNotification(message, type = 'info') {
-      const n = document.createElement('div');
-      n.className = `notification ${type}`;
-      n.textContent = message;
-      document.body.appendChild(n);
-      setTimeout(() => { n.style.animation = 'slideIn .3s ease reverse'; setTimeout(() => n.remove(), 300); }, 3000);
-    }
-
-    function formatCard(card){ const s = card.slice(-1), r = card.slice(0,-1); const m={H:'♥️',D:'♦️',C:'♣️',S:'♠️'}; return r + m[s]; }
-    function getCardClass(card){ const s = card.slice(-1); return s==='H'||s==='D' ? 'hearts' : (s==='S'?'spades':'clubs'); }
 
     let authToken = localStorage.getItem('authToken');
     let currentUser = null;
@@ -337,6 +332,7 @@
     const createRoomBtn = document.getElementById('createRoomBtn');
     const addFriendBtn = document.getElementById('addFriendBtn');
     const readyBtn = document.getElementById('readyBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const sendChatBtn = document.getElementById('sendChatBtn');
 
     switchToRegister.onclick = () => { loginForm.style.display='none'; registerForm.style.display='block'; };
@@ -367,114 +363,17 @@
       } catch (err) { showNotification(err.message || 'Registration failed', 'error'); }
     });
 
-    }
-  setInterval(() => { if (currentUser && !currentRoomId) loadRooms(); }, 10000);
-}
     logoutBtn.onclick = async () => {
       try { await fetch('/api/logout', { method:'POST', headers:{ 'Authorization': authToken } }); } catch {}
-      localStorage.removeItem('authToken'); location.reload();
+      localStorage.removeItem('authToken'); 
+      localStorage.removeItem('gameSession');
+      location.reload();
     };
-
-    // session persistence + reconnection
-    function saveSessionInfo(sessionId, roomId, seat) {
-      localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
-    }
-
-    async function checkForReconnection() {
-      const saved = localStorage.getItem('gameSession');
-      if (!saved) return false;
-      try {
-        const { sessionId: oldSessionId, roomId, seat, timestamp } = JSON.parse(saved);
-        if (Date.now() - timestamp > 30 * 60 * 1000) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const shouldReconnect = confirm(`You have an ongoing game in room "${roomId}". Reconnect?`);
-        if (!shouldReconnect) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const data = await api.json('/api/reconnect', {
-          method: 'POST',
-          headers: { 'Authorization': authToken },
-          body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
-        });
-        sessionId = data.session_id;
-        currentRoomId = data.room_state.room_id;
-        playerSeat = data.seat;
-        lastTimestamp = 0;
-        document.getElementById('currentRoom').textContent = currentRoomId;
-        document.getElementById('yourSeat').textContent = playerSeat + 1;
-        document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
-        updatePlayers(data.players);
-        if (data.hand) renderHand(data.hand);
-        if (data.team_scores) updateScores(data.team_scores);
-        if (data.current_trick) updateTrickArea(data);
-        saveSessionInfo(sessionId, currentRoomId, playerSeat);
-        startPolling();
-        showNotification('Reconnected successfully!', 'success');
-        return true;
-      } catch (e) {
-        console.error('Reconnection failed:', e);
-        localStorage.removeItem('gameSession');
-        showNotification('Could not reconnect to game', 'error');
-        return false;
-      }
-    }
-
 
     createRoomBtn.onclick = async () => {
       const roomName = document.getElementById('roomNameInput').value || `Room-${Date.now()}`;
       await joinRoom(roomName);
     };
-
-    // session persistence + reconnection
-    function saveSessionInfo(sessionId, roomId, seat) {
-      localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
-    }
-
-    async function checkForReconnection() {
-      const saved = localStorage.getItem('gameSession');
-      if (!saved) return false;
-      try {
-        const { sessionId: oldSessionId, roomId, seat, timestamp } = JSON.parse(saved);
-        if (Date.now() - timestamp > 30 * 60 * 1000) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const shouldReconnect = confirm(`You have an ongoing game in room "${roomId}". Reconnect?`);
-        if (!shouldReconnect) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const data = await api.json('/api/reconnect', {
-          method: 'POST',
-          headers: { 'Authorization': authToken },
-          body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
-        });
-        sessionId = data.session_id;
-        currentRoomId = data.room_state.room_id;
-        playerSeat = data.seat;
-        lastTimestamp = 0;
-        document.getElementById('currentRoom').textContent = currentRoomId;
-        document.getElementById('yourSeat').textContent = playerSeat + 1;
-        document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
-        updatePlayers(data.players);
-        if (data.hand) renderHand(data.hand);
-        if (data.team_scores) updateScores(data.team_scores);
-        if (data.current_trick) updateTrickArea(data);
-        saveSessionInfo(sessionId, currentRoomId, playerSeat);
-        startPolling();
-        showNotification('Reconnected successfully!', 'success');
-        return true;
-      } catch (e) {
-        console.error('Reconnection failed:', e);
-        localStorage.removeItem('gameSession');
-        showNotification('Could not reconnect to game', 'error');
-        return false;
-      }
-    }
-
 
     addFriendBtn.onclick = async () => {
       const username = document.getElementById('friendUsername').value.trim();
@@ -487,54 +386,6 @@
       } catch (err) { showNotification(err.message || 'Failed to add friend','error'); }
     };
 
-    // session persistence + reconnection
-    function saveSessionInfo(sessionId, roomId, seat) {
-      localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
-    }
-
-    async function checkForReconnection() {
-      const saved = localStorage.getItem('gameSession');
-      if (!saved) return false;
-      try {
-        const { sessionId: oldSessionId, roomId, seat, timestamp } = JSON.parse(saved);
-        if (Date.now() - timestamp > 30 * 60 * 1000) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const shouldReconnect = confirm(`You have an ongoing game in room "${roomId}". Reconnect?`);
-        if (!shouldReconnect) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const data = await api.json('/api/reconnect', {
-          method: 'POST',
-          headers: { 'Authorization': authToken },
-          body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
-        });
-        sessionId = data.session_id;
-        currentRoomId = data.room_state.room_id;
-        playerSeat = data.seat;
-        lastTimestamp = 0;
-        document.getElementById('currentRoom').textContent = currentRoomId;
-        document.getElementById('yourSeat').textContent = playerSeat + 1;
-        document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
-        updatePlayers(data.players);
-        if (data.hand) renderHand(data.hand);
-        if (data.team_scores) updateScores(data.team_scores);
-        if (data.current_trick) updateTrickArea(data);
-        saveSessionInfo(sessionId, currentRoomId, playerSeat);
-        startPolling();
-        showNotification('Reconnected successfully!', 'success');
-        return true;
-      } catch (e) {
-        console.error('Reconnection failed:', e);
-        localStorage.removeItem('gameSession');
-        showNotification('Could not reconnect to game', 'error');
-        return false;
-      }
-    }
-
-
     readyBtn.onclick = async () => {
       if (!sessionId) return showNotification('Join a room first', 'error');
       try { 
@@ -544,53 +395,27 @@
       } catch (e){ showNotification(e.message,'error'); }
     };
 
-    // session persistence + reconnection
-    function saveSessionInfo(sessionId, roomId, seat) {
-      localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
-    }
-
-    async function checkForReconnection() {
-      const saved = localStorage.getItem('gameSession');
-      if (!saved) return false;
+    leaveRoomBtn.onclick = async () => {
+      if (!sessionId) return;
+      if (!confirm('Are you sure you want to leave the room?')) return;
       try {
-        const { sessionId: oldSessionId, roomId, seat, timestamp } = JSON.parse(saved);
-        if (Date.now() - timestamp > 30 * 60 * 1000) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const shouldReconnect = confirm(`You have an ongoing game in room "${roomId}". Reconnect?`);
-        if (!shouldReconnect) {
-          localStorage.removeItem('gameSession');
-          return false;
-        }
-        const data = await api.json('/api/reconnect', {
-          method: 'POST',
-          headers: { 'Authorization': authToken },
-          body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
-        });
-        sessionId = data.session_id;
-        currentRoomId = data.room_state.room_id;
-        playerSeat = data.seat;
-        lastTimestamp = 0;
-        document.getElementById('currentRoom').textContent = currentRoomId;
-        document.getElementById('yourSeat').textContent = playerSeat + 1;
-        document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
-        updatePlayers(data.players);
-        if (data.hand) renderHand(data.hand);
-        if (data.team_scores) updateScores(data.team_scores);
-        if (data.current_trick) updateTrickArea(data);
-        saveSessionInfo(sessionId, currentRoomId, playerSeat);
-        startPolling();
-        showNotification('Reconnected successfully!', 'success');
-        return true;
-      } catch (e) {
-        console.error('Reconnection failed:', e);
+        await api.json('/api/leave', { method:'POST', headers:{ 'Authorization': authToken }, body: JSON.stringify({ session_id: sessionId }) });
+        sessionId = null;
+        currentRoomId = null;
+        playerSeat = null;
+        polling = false;
         localStorage.removeItem('gameSession');
-        showNotification('Could not reconnect to game', 'error');
-        return false;
-      }
-    }
-
+        document.getElementById('currentRoom').textContent = '-';
+        document.getElementById('yourSeat').textContent = '-';
+        document.getElementById('yourTeam').textContent = '-';
+        document.getElementById('playerHand').innerHTML = '';
+        document.getElementById('leaveRoomBtn').style.display = 'none';
+        readyBtn.disabled = false;
+        clearTrickArea();
+        showNotification('Left room', 'info');
+        loadRooms();
+      } catch (e) { showNotification(e.message || 'Failed to leave room', 'error'); }
+    };
 
     sendChatBtn.onclick = sendChat;
     document.getElementById('chatInput').addEventListener('keypress', e => { if (e.key==='Enter') sendChat(); });
@@ -613,7 +438,7 @@
           el.onclick = () => joinRoom(r.room_id);
           rb.appendChild(el);
         });
-      } catch (e) { console.error('loadRooms', e); }
+        } catch (e) { console.error('loadRooms', e); }
     }
 
     async function loadFriends() {
@@ -636,9 +461,6 @@
       } catch (e) { console.error('loadLeaderboard', e); }
     }
 
-        }
-
-
     async function joinRoom(roomId){
       try {
         const data = await api.json('/api/join', { method:'POST', headers:{ 'Authorization': authToken }, body: JSON.stringify({ room_id: roomId })});
@@ -650,6 +472,7 @@
         document.getElementById('currentRoom').textContent = roomId;
         document.getElementById('yourSeat').textContent = playerSeat + 1;
         document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
+        document.getElementById('leaveRoomBtn').style.display = 'block';
         updatePlayers(data.players);
         startPolling();
         showNotification(`Joined room: ${roomId}`, 'success');
@@ -660,10 +483,8 @@
       for(let seat=0; seat<4; seat++){
         const el = document.getElementById(`player${seat}`);
         if(players[seat]){
-          
           el.innerHTML = `<div class="player-name">${players[seat].name}</div><div style="font-size:.9rem; color:#94a3b8;">Team ${players[seat].team} ${players[seat].is_ready ? '✓':''}</div>`;
           if (seat === playerSeat) el.classList.add('active'); else el.classList.remove('active');
-          
         } else { el.innerHTML = '<div class="player-name">Waiting...</div>'; el.classList.remove('active'); }
       }
     }
@@ -677,7 +498,6 @@
       if(!sessionId) return;
       if(!confirm(`Play ${formatCard(card)}?`)) return;
       try{
-        
         await api.json('/api/play_card', { method:'POST', headers:{ 'Authorization': authToken }, body: JSON.stringify({ session_id: sessionId, card }) });
       } catch(e){ showNotification(e.message || 'Cannot play card','error'); }
     }
@@ -699,7 +519,6 @@
       const b = document.querySelector('#teamBScore .team-points');
       a.textContent = scores.team_a || 0; b.textContent = scores.team_b || 0;
       document.getElementById('teamAScore').classList.toggle('winning',(scores.team_a||0)>(scores.team_b||0));
-      
       document.getElementById('teamBScore').classList.toggle('winning',(scores.team_b||0)>(scores.team_a||0));
     }
 
@@ -715,7 +534,6 @@
       const input = document.getElementById('chatInput');
       const msg = input.value.trim(); 
       if(!msg || !sessionId) return;
-      
       try {
         await api.json('/api/chat', { 
           method:'POST', 
@@ -736,7 +554,6 @@
           const url = `/api/poll?session_id=${encodeURIComponent(sessionId)}&last_timestamp=${encodeURIComponent(String(lastTimestamp||0))}`;
           const res = await fetch(url, { headers:{ 'Authorization': authToken } });
           const ct = res.headers.get('content-type')||'';
-          
           if(!ct.includes('application/json')){ await new Promise(r=>setTimeout(r,1000)); continue; }
           const data = await res.json();
           if (data.events && data.events.length){
@@ -754,12 +571,17 @@
           updatePlayers(event.data.players); 
           addChatMessage('System', `${event.data.player_name} joined`); 
           break;
-          
+        case 'player_left':
+          updatePlayers(event.data.players);
+          addChatMessage('System', `${event.data.player_name} left the room`);
+          break;
+        case 'player_reconnected':
+          addChatMessage('System', `${event.data.player_name} reconnected`);
+          break;
         case 'player_ready': 
           addChatMessage('System', `${event.data.player_name} is ready`); 
           if(event.data.players) updatePlayers(event.data.players);
           break;
-          
         case 'game_started': 
           showNotification('Game started!','success'); 
           addChatMessage('System','Game started! Cards dealt...'); 
@@ -768,36 +590,30 @@
           clearTrickArea();
           document.getElementById('trickNumber').textContent = '1';
           break;
-          
         case 'cards_dealt': 
           if (event.data.seat === playerSeat) {
             renderHand(event.data.cards);
           }
           break;
-          
         case 'card_played': 
           updateTrickArea(event.data); 
           addChatMessage('Game', `${event.data.player_name} played ${formatCard(event.data.card)}`); 
           break;
-          
         case 'trick_won': 
           showNotification(`${event.data.winner_name} wins the trick! (+${event.data.points} points)`, 'info'); 
           updateScores(event.data.team_scores); 
           addChatMessage('Game', `${event.data.winner_name} won trick ${event.data.trick_count} (+${event.data.points} pts)`);
           setTimeout(clearTrickArea, 1500); 
           break;
-          
         case 'round_complete': 
           showNotification(`Round ${event.data.round_number} over! ${event.data.round_winner} wins!`, 'success'); 
           updateScores(event.data.total_scores); 
           addChatMessage('System', `🏆 ${event.data.round_winner} won round ${event.data.round_number} with ${event.data.winning_score} points!`);
           addChatMessage('System', `Total Scores - Team A: ${event.data.total_scores.team_a}, Team B: ${event.data.total_scores.team_b}`);
-          
           document.getElementById('playerHand').innerHTML = '';
           clearTrickArea();
           readyBtn.disabled = false; 
           break;
-          
         case 'game_complete': 
           showNotification(`🏆 Game Over! ${event.data.game_winner} wins the game!`, 'success'); 
           updateScores(event.data.final_total_scores); 
@@ -806,17 +622,14 @@
           document.getElementById('playerHand').innerHTML = '';
           clearTrickArea();
           break;
-          
         case 'next_trick_ready': 
           document.getElementById('trickNumber').textContent = event.data.trick_number; 
           addChatMessage('Game', `Trick ${event.data.trick_number} - ${event.data.leader_name} leads`);
           break;
-          
         case 'new_round_ready': 
           addChatMessage('System', event.data.message); 
           readyBtn.disabled = false; 
           break;
-          
         case 'chat_message': 
           addChatMessage(event.data.author, event.data.message); 
           break;
@@ -831,10 +644,6 @@
       document.getElementById('userLevel').textContent = `Level ${currentUser.level||1} • ${currentUser.experience||0} XP`;
       loadRooms(); loadFriends(); loadLeaderboard();
     }
-
-    setInterval(() => { if (currentUser && !currentRoomId) loadRooms(); }, 10000);
-    }
-
 
     async function init(){
       if (authToken) {

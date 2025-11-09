@@ -1,7 +1,13 @@
 """
-Baloot Game Server - Final Version (Week 11)
+Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
 ENGR4450 - Distributed Systems Project
+
+NEW FEATURES:
+- Game pauses when player disconnects (60s wait)
+- Full game state persistence in database
+- Enhanced reconnection with complete state restore
+- Heartbeat monitoring for connection health
 """
 import uuid
 import time
@@ -11,7 +17,7 @@ import secrets
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
-from threading import Lock
+from threading import Lock, Timer
 from collections import deque
 from functools import wraps
 
@@ -35,7 +41,7 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Extended to 30 days
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
@@ -59,13 +65,16 @@ events_queue = {}
 events_lock = Lock()
 user_sessions = {}
 user_sessions_lock = Lock()
+reconnect_timers = {}  # Track reconnection timers
+paused_rooms = {}  # Track paused rooms
 
 # Game constants
 MAX_PLAYERS_PER_ROOM = 4
-MAX_EVENTS_PER_ROOM = 200  # Increased for better history
+MAX_EVENTS_PER_ROOM = 200
 PORT = int(os.environ.get('PORT', 10000))
-SESSION_TIMEOUT = 300  # 5 minutes for reconnection
+SESSION_TIMEOUT = 300  # 5 minutes
 HEARTBEAT_INTERVAL = 30  # 30 seconds
+RECONNECT_WAIT_TIME = 60  # 60 seconds to wait for reconnection
 
 # Database Models
 class User(db.Model):
@@ -85,7 +94,7 @@ class User(db.Model):
     win_rate = db.Column(db.Float, default=0.0)
     level = db.Column(db.Integer, default=1)
     experience = db.Column(db.Integer, default=0)
-    auth_token = db.Column(db.String(64), unique=True, index=True)  # Persistent token
+    auth_token = db.Column(db.String(64), unique=True, index=True)
     token_expires = db.Column(db.DateTime)
 
     def to_dict(self):
@@ -118,7 +127,6 @@ class User(db.Model):
             return False
         if self.token_expires and datetime.utcnow() > self.token_expires:
             return False
-        # Extend token expiration on successful verification
         self.token_expires = datetime.utcnow() + timedelta(days=30)
         db.session.commit()
         return True
@@ -133,7 +141,7 @@ class Friendship(db.Model):
     friend = db.relationship('User', foreign_keys=[friend_id], backref='friendships_received')
 
 class GameSession(db.Model):
-    """Persistent game session for reconnection"""
+    """ENHANCED: Persistent game session with full game state"""
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -142,7 +150,16 @@ class GameSession(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_activity = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
-    game_state = db.Column(db.Text)  # JSON string of game state
+    
+    # ENHANCED: Store complete game state
+    game_state = db.Column(db.Text)  # JSON: game_state, round_count, etc.
+    player_hand = db.Column(db.Text)  # JSON: player's cards
+    current_trick = db.Column(db.Text)  # JSON: cards in current trick
+    team_scores = db.Column(db.Text)  # JSON: team_a, team_b
+    total_scores = db.Column(db.Text)  # JSON: cumulative scores
+    current_player = db.Column(db.Integer)  # Who's turn
+    trick_count = db.Column(db.Integer, default=0)
+    round_number = db.Column(db.Integer, default=1)
 
 # Auth helpers
 def login_required(f):
@@ -153,7 +170,6 @@ def login_required(f):
         if not auth_token:
             return jsonify({'error': 'Authentication required'}), 401
         
-        # Check database for persistent token
         user = User.query.filter_by(auth_token=auth_token).first()
         if not user or not user.verify_auth_token(auth_token):
             return jsonify({'error': 'Invalid or expired token'}), 401
@@ -161,9 +177,6 @@ def login_required(f):
         request.current_user = user
         return f(*args, **kwargs)
     return decorated_function
-
-def create_session_token() -> str:
-    return secrets.token_urlsafe(32)
 
 # Room helpers with thread safety
 def get_or_create_room(room_id: str) -> Room:
@@ -186,27 +199,96 @@ def broadcast_event(room_id: str, event_type: str, data: dict) -> None:
             events_queue[room_id].append(event)
             logger.info(f"Event: {event_type} in room {room_id}")
 
-def cleanup_inactive_sessions():
-    """Clean up inactive game sessions"""
+def save_game_state_to_db(room: Room, room_id: str):
+    """ENHANCED: Save complete game state to database for all players"""
     try:
-        cutoff = datetime.utcnow() - timedelta(seconds=SESSION_TIMEOUT)
-        inactive_sessions = GameSession.query.filter(
-            GameSession.last_activity < cutoff,
-            GameSession.is_active == True
-        ).all()
+        if not room.game:
+            return
         
-        for session in inactive_sessions:
-            session.is_active = False
-            # Remove from active player_sessions if exists
-            with sessions_lock:
-                if session.session_id in player_sessions:
-                    del player_sessions[session.session_id]
+        for seat, player in room.players.items():
+            if not player or not player.user_id:
+                continue
+                
+            game_session = GameSession.query.filter_by(
+                user_id=player.user_id,
+                room_id=room_id,
+                is_active=True
+            ).first()
+            
+            if game_session:
+                # Save complete state
+                game_session.game_state = room.game_state.value
+                game_session.player_hand = json.dumps(room.game.hands.get(seat, []))
+                game_session.current_trick = json.dumps([
+                    {'seat': s, 'card': c} for s, c in room.game.current_trick
+                ])
+                game_session.team_scores = json.dumps(room.game.team_scores)
+                game_session.total_scores = json.dumps(room.total_scores)
+                game_session.current_player = room.game.current_player
+                game_session.trick_count = room.game.trick_count
+                game_session.round_number = room.round_count
+                game_session.last_activity = datetime.utcnow()
         
         db.session.commit()
-        logger.info(f"Cleaned up {len(inactive_sessions)} inactive sessions")
+        logger.info(f"Saved game state for room {room_id}")
     except Exception as e:
-        logger.error(f"Error cleaning up sessions: {e}")
+        logger.error(f"Error saving game state: {e}")
         db.session.rollback()
+
+def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: str):
+    """ENHANCED: Pause game and wait for player to reconnect"""
+    if room_id in paused_rooms:
+        return  # Already paused
+    
+    paused_rooms[room_id] = {
+        'seat': disconnected_seat,
+        'player_name': player_name,
+        'paused_at': time.time()
+    }
+    
+    broadcast_event(room_id, 'game_paused', {
+        'reason': f'{player_name} disconnected',
+        'wait_time': RECONNECT_WAIT_TIME,
+        'message': f'⏸️ Game paused. Waiting {RECONNECT_WAIT_TIME}s for {player_name} to reconnect...'
+    })
+    
+    # Set timer to auto-resume if no reconnection
+    def timeout_handler():
+        if room_id in paused_rooms:
+            del paused_rooms[room_id]
+            with rooms_lock:
+                room = rooms.get(room_id)
+                if room:
+                    # Remove disconnected player
+                    room.players[disconnected_seat] = None
+                    broadcast_event(room_id, 'game_resumed', {
+                        'reason': 'Reconnection timeout',
+                        'message': f'❌ {player_name} did not reconnect. Game ending...'
+                    })
+                    # End the game
+                    room.game_state = GameState.FINISHED
+    
+    timer = Timer(RECONNECT_WAIT_TIME, timeout_handler)
+    reconnect_timers[room_id] = timer
+    timer.start()
+    
+    logger.info(f"Game paused in room {room_id}, waiting for {player_name}")
+
+def resume_game_after_reconnect(room_id: str):
+    """ENHANCED: Resume game after successful reconnection"""
+    if room_id in paused_rooms:
+        del paused_rooms[room_id]
+    
+    if room_id in reconnect_timers:
+        reconnect_timers[room_id].cancel()
+        del reconnect_timers[room_id]
+    
+    broadcast_event(room_id, 'game_resumed', {
+        'reason': 'Player reconnected',
+        'message': '▶️ Game resumed! All players connected.'
+    })
+    
+    logger.info(f"Game resumed in room {room_id}")
 
 # Routes
 @app.route('/')
@@ -264,7 +346,7 @@ def register():
             'user': user.to_dict()
         }))
         response.set_cookie('auth_token', auth_token, 
-                          max_age=30*24*60*60,  # 30 days
+                          max_age=30*24*60*60,
                           httponly=True,
                           samesite='Lax')
         return response, 201
@@ -291,7 +373,6 @@ def login():
         if not user or not check_password_hash(user.password_hash, password):
             return jsonify({'error': 'Invalid credentials'}), 401
         
-        # Update last login
         user.last_login = datetime.utcnow()
         auth_token = user.generate_auth_token()
         
@@ -301,7 +382,7 @@ def login():
             'user': user.to_dict()
         }))
         response.set_cookie('auth_token', auth_token,
-                          max_age=30*24*60*60,  # 30 days
+                          max_age=30*24*60*60,
                           httponly=True,
                           samesite='Lax')
         return response, 200
@@ -313,7 +394,6 @@ def login():
 @login_required
 def logout():
     try:
-        # Clear the auth token from database
         request.current_user.auth_token = None
         request.current_user.token_expires = None
         db.session.commit()
@@ -387,7 +467,6 @@ def get_friends():
     friends = []
     for f in friendships:
         friend = f.friend if f.user_id == request.current_user.id else f.user
-        # Check if friend is online (has active session)
         is_online = GameSession.query.filter_by(
             user_id=friend.id,
             is_active=True
@@ -446,12 +525,13 @@ def add_friend():
 @app.route('/api/reconnect', methods=['POST'])
 @login_required
 def reconnect():
+    """ENHANCED: Reconnect with complete state restoration"""
     try:
         data = request.get_json(force=True)
         old_session_id = data.get('session_id')
         room_id = data.get('room_id')
         
-        # Check for existing game session in database
+        # Load game session from database
         game_session = GameSession.query.filter_by(
             user_id=request.current_user.id,
             room_id=room_id,
@@ -472,7 +552,7 @@ def reconnect():
         player = room.players[seat]
         
         if not player:
-            # Recreate player if missing
+            # Recreate player
             player = Player(
                 new_session_id,
                 request.current_user.display_name or request.current_user.username
@@ -500,29 +580,39 @@ def reconnect():
                 'user_id': request.current_user.id
             }
         
-        # Prepare response
-        game_state = {
+        # ENHANCED: Build complete state response
+        game_state_response = {
             'session_id': new_session_id,
             'seat': seat,
             'room_state': room.get_state(),
             'players': room.get_players_info(),
+            'game_state': game_session.game_state,
+            'round_number': game_session.round_number,
+            'trick_count': game_session.trick_count,
         }
         
-        if room.game:
-            game_state.update({
-                'hand': room.game.hands[seat],
-                'current_trick': [{'seat': s, 'card': c} for s, c in room.game.current_trick],
-                'current_player': room.game.current_player,
-                'trick_count': room.game.trick_count,
-                'team_scores': room.game.team_scores,
-            })
+        # Restore from database if game in progress
+        if game_session.game_state == 'IN_PROGRESS':
+            try:
+                game_state_response['hand'] = json.loads(game_session.player_hand) if game_session.player_hand else []
+                game_state_response['current_trick'] = json.loads(game_session.current_trick) if game_session.current_trick else []
+                game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
+                game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
+                game_state_response['current_player'] = game_session.current_player
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding game state: {e}")
+        
+        # Resume game if it was paused
+        if room_id in paused_rooms:
+            resume_game_after_reconnect(room_id)
         
         broadcast_event(room_id, 'player_reconnected', {
             'player_name': player.name,
             'seat': seat
         })
         
-        return jsonify(game_state), 200
+        logger.info(f"Player {player.name} reconnected to room {room_id}")
+        return jsonify(game_state_response), 200
     except Exception as e:
         logger.error(f"Reconnect error: {e}")
         return jsonify({'error': 'Reconnection failed'}), 500
@@ -530,6 +620,7 @@ def reconnect():
 @app.route('/api/leave', methods=['POST'])
 @login_required
 def leave_room():
+    """ENHANCED: Handle player leaving with game pause"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -548,7 +639,14 @@ def leave_room():
                 return jsonify({'error': 'Room not found'}), 404
             
             player_name = session_data['player'].name
-            room.remove_player(session_id)
+            
+            # If game is in progress, pause it
+            if room.game_state == GameState.IN_PROGRESS:
+                pause_game_for_reconnect(room_id, seat, player_name)
+                # Don't remove player yet, give them time to reconnect
+            else:
+                # Not in game, remove immediately
+                room.remove_player(session_id)
         
         # Mark game session as inactive
         game_session = GameSession.query.filter_by(
@@ -567,15 +665,6 @@ def leave_room():
             'players': room.get_players_info()
         })
         
-        # Clean up empty room
-        with rooms_lock:
-            if all(p is None for p in room.players.values()):
-                del rooms[room_id]
-                with events_lock:
-                    if room_id in events_queue:
-                        del events_queue[room_id]
-                logger.info(f"Removed empty room: {room_id}")
-        
         return jsonify({'success': True}), 200
     except Exception as e:
         logger.error(f"Leave room error: {e}")
@@ -591,6 +680,7 @@ def get_active_rooms():
                 'player_count': sum(1 for p in room.players.values() if p),
                 'game_state': room.game_state.value,
                 'total_scores': room.total_scores,
+                'is_paused': room_id in paused_rooms,
             })
     return jsonify(active_rooms), 200
 
@@ -692,13 +782,16 @@ def player_ready():
                     'round_number': room.round_count,
                 })
                 
-                # Deal cards to all players
+                # Deal cards and save state
                 for s in range(4):
                     if room.players[s]:
                         broadcast_event(room_id, 'cards_dealt', {
                             'seat': s,
                             'cards': room.game.hands[s]
                         })
+                
+                # Save initial game state
+                save_game_state_to_db(room, room_id)
         
         return jsonify({'success': True}), 200
     except Exception as e:
@@ -776,6 +869,7 @@ def poll_events():
 @app.route('/api/play_card', methods=['POST'])
 @login_required
 def play_card_enhanced():
+    """ENHANCED: Check if game is paused before allowing play"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -788,6 +882,10 @@ def play_card_enhanced():
             session_data = player_sessions[session_id]
             room_id = session_data['room_id']
             seat = session_data['seat']
+        
+        # Check if game is paused
+        if room_id in paused_rooms:
+            return jsonify({'error': 'Game is paused, waiting for player to reconnect'}), 400
         
         with rooms_lock:
             room = rooms.get(room_id)
@@ -807,6 +905,9 @@ def play_card_enhanced():
                 return jsonify({'error': message}), 400
             
             player_name = session_data['player'].name
+        
+        # Save state after card played
+        save_game_state_to_db(room, room_id)
         
         broadcast_event(room_id, 'card_played', {
             'seat': seat,
@@ -836,6 +937,9 @@ def play_card_enhanced():
                     'next_leader_name': winner_name,
                 })
                 
+                # Save state after trick resolved
+                save_game_state_to_db(room, room_id)
+                
                 cards_remaining = sum(len(hand) for hand in room.game.hands.values())
                 if cards_remaining == 0:
                     handle_round_end(room, room_id)
@@ -862,7 +966,7 @@ def play_card_enhanced():
 @app.route('/api/heartbeat', methods=['POST'])
 @login_required
 def heartbeat():
-    """Keep session alive"""
+    """ENHANCED: Keep session alive and check for disconnections"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -880,6 +984,19 @@ def heartbeat():
         with sessions_lock:
             if session_id in player_sessions:
                 player_sessions[session_id]['player'].update_activity()
+        
+        # Check for other disconnected players in the room
+        with sessions_lock:
+            if session_id in player_sessions:
+                room_id = player_sessions[session_id]['room_id']
+                with rooms_lock:
+                    room = rooms.get(room_id)
+                    if room and room.game_state == GameState.IN_PROGRESS:
+                        for seat, player in room.players.items():
+                            if player and player.is_disconnected(60):
+                                # Player hasn't sent heartbeat in 60s
+                                if room_id not in paused_rooms:
+                                    pause_game_for_reconnect(room_id, seat, player.name)
         
         return jsonify({'success': True}), 200
     except Exception as e:
@@ -941,16 +1058,13 @@ def update_player_stats(room: Room, game_winner: str) -> None:
                     
                     user.win_rate = (user.games_won / user.games_played * 100) if user.games_played > 0 else 0
                     
-                    # XP calculation
                     xp_gained = 100 if seat in winning_team_seats else 50
                     user.experience += xp_gained
                     
-                    # Level calculation
                     new_level = (user.experience // 500) + 1
                     if new_level > user.level:
                         user.level = new_level
                     
-                    # Points tracking
                     team_key = 'team_a' if seat in [0, 2] else 'team_b'
                     user.total_points += room.total_scores[team_key]
         
@@ -961,7 +1075,7 @@ def update_player_stats(room: Room, game_winner: str) -> None:
         db.session.rollback()
 
 def start_new_round(room: Room, room_id: str) -> None:
-    """Prepare for next round - reset ready status and game"""
+    """Prepare for next round"""
     for p in room.players.values():
         if p:
             p.is_ready = False
@@ -1000,8 +1114,6 @@ def _json_500(e):
 with app.app_context():
     db.create_all()
     logger.info("Database initialized")
-    # Clean up old sessions on startup
-    cleanup_inactive_sessions()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=False)

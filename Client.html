@@ -89,6 +89,7 @@
     .notification.success{ border-color:rgba(16,185,129,.5); background:rgba(16,185,129,.1); }
     .notification.error{ border-color:rgba(239,68,68,.5); background:rgba(239,68,68,.1); }
     .notification.info{ border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.1); }
+    .notification.warning{ border-color:rgba(251,191,36,.5); background:rgba(251,191,36,.1); }
     @media (max-width:1200px){ .main-content{ grid-template-columns:1fr; } .sidebar{ display:none; } }
     @media (max-width:768px){ .auth-card{ padding:30px 20px; } .container{ padding:10px; } .game-table{ padding:20px; } .card{ padding:10px 15px; font-size:1.1rem; } }
   </style>
@@ -273,46 +274,145 @@
       localStorage.setItem('gameSession', JSON.stringify({ sessionId, roomId, seat, timestamp: Date.now() }));
     }
 
+    // ENHANCED: Complete reconnection system with full state restoration
     async function checkForReconnection() {
       const saved = localStorage.getItem('gameSession');
       if (!saved) return false;
+      
       try {
         const { sessionId: oldSessionId, roomId, seat, timestamp } = JSON.parse(saved);
+        
+        // Check if session is still valid (30 min window)
         if (Date.now() - timestamp > 30 * 60 * 1000) {
           localStorage.removeItem('gameSession');
           return false;
         }
-        const shouldReconnect = confirm(`You have an ongoing game in room "${roomId}". Reconnect?`);
+        
+        // ENHANCED: Show detailed reconnection modal
+        const shouldReconnect = confirm(
+          `🔄 Reconnection Available\n\n` +
+          `You have an active game in room "${roomId}".\n` +
+          `Seat: ${seat + 1} | Team: ${[0,2].includes(seat) ? 'A' : 'B'}\n\n` +
+          `Do you want to reconnect?`
+        );
+        
         if (!shouldReconnect) {
           localStorage.removeItem('gameSession');
           return false;
         }
+
+        showNotification('Reconnecting to game...', 'info');
+        
         const data = await api.json('/api/reconnect', {
           method: 'POST',
           headers: { 'Authorization': authToken },
           body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
         });
+        
+        // Update session info
         sessionId = data.session_id;
         currentRoomId = data.room_state.room_id;
         playerSeat = data.seat;
         lastTimestamp = 0;
+        
+        // Update UI with room info
         document.getElementById('currentRoom').textContent = currentRoomId;
         document.getElementById('yourSeat').textContent = playerSeat + 1;
         document.getElementById('yourTeam').textContent = [0,2].includes(playerSeat) ? 'A' : 'B';
         document.getElementById('leaveRoomBtn').style.display = 'block';
+        
+        // Restore players
         updatePlayers(data.players);
-        if (data.hand) renderHand(data.hand);
-        if (data.team_scores) updateScores(data.team_scores);
-        if (data.current_trick) updateTrickArea(data);
+        
+        // ENHANCED: Restore game state if in progress
+        if (data.game_state === 'IN_PROGRESS') {
+          document.getElementById('roundNumber').textContent = data.round_number || 1;
+          document.getElementById('trickNumber').textContent = (data.trick_count || 0) + 1;
+          
+          // Restore hand - FIXED: Cards now show after reconnect
+          if (data.hand && data.hand.length > 0) {
+            renderHand(data.hand);
+          }
+          
+          // Restore scores
+          if (data.team_scores) {
+            updateScores(data.team_scores);
+          }
+          
+          // ENHANCED: Restore current trick with ALL cards played
+          if (data.current_trick && data.current_trick.length > 0) {
+            clearTrickArea();
+            data.current_trick.forEach(tr => {
+              const slot = document.getElementById(`trickCard${tr.seat}`);
+              if (slot) {
+                slot.className = 'trick-card-slot filled';
+                slot.textContent = formatCard(tr.card);
+              }
+            });
+          }
+          
+          // Update current turn indicator
+          if (typeof data.current_player === 'number') {
+            const currPlayer = data.players[data.current_player];
+            document.getElementById('currentTurn').textContent = 
+              currPlayer ? currPlayer.name : `Player ${data.current_player + 1}`;
+          }
+          
+          readyBtn.disabled = true;
+        } else {
+          readyBtn.disabled = !data.room_state || data.room_state.game_state === 'WAITING';
+        }
+        
         saveSessionInfo(sessionId, currentRoomId, playerSeat);
         startPolling();
-        showNotification('Reconnected successfully!', 'success');
+        startHeartbeat();  // NEW: Start heartbeat monitoring
+        
+        showNotification('✅ Reconnected successfully! Game resumed.', 'success');
         return true;
       } catch (e) {
         console.error('Reconnection failed:', e);
         localStorage.removeItem('gameSession');
-        showNotification('Could not reconnect to game', 'error');
+        showNotification('❌ Could not reconnect to game. ' + (e.message || ''), 'error');
         return false;
+      }
+    }
+
+    // ENHANCED: Heartbeat system for connection monitoring
+    let heartbeatInterval = null;
+
+    function startHeartbeat() {
+      // Clear any existing heartbeat
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      // Send heartbeat every 30 seconds
+      heartbeatInterval = setInterval(async () => {
+        if (!sessionId || !authToken) {
+          stopHeartbeat();
+          return;
+        }
+        
+        try {
+          await api.json('/api/heartbeat', {
+            method: 'POST',
+            headers: { 'Authorization': authToken },
+            body: JSON.stringify({ session_id: sessionId })
+          });
+          console.log('Heartbeat sent');
+        } catch (e) {
+          console.error('Heartbeat failed:', e);
+        }
+      }, 30000);  // 30 seconds
+      
+      console.log('Heartbeat monitoring started');
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+        console.log('Heartbeat monitoring stopped');
       }
     }
 
@@ -344,7 +444,9 @@
       const password = document.getElementById('loginPassword').value;
       try {
         const data = await api.json('/api/login', { method:'POST', body: JSON.stringify({ username, password }) });
-        authToken = data.auth_token; currentUser = data.user; localStorage.setItem('authToken', authToken);
+        authToken = data.auth_token; 
+        currentUser = data.user; 
+        localStorage.setItem('authToken', authToken);
         await showGameApp();
       } catch (err) { showNotification(err.message || 'Login failed', 'error'); }
     });
@@ -358,7 +460,9 @@
       if (password !== confirmPassword) { showNotification('Passwords do not match','error'); return; }
       try {
         const data = await api.json('/api/register', { method:'POST', body: JSON.stringify({ username, email, password }) });
-        authToken = data.auth_token; currentUser = data.user; localStorage.setItem('authToken', authToken);
+        authToken = data.auth_token; 
+        currentUser = data.user; 
+        localStorage.setItem('authToken', authToken);
         await showGameApp();
       } catch (err) { showNotification(err.message || 'Registration failed', 'error'); }
     });
@@ -367,6 +471,9 @@
       try { await fetch('/api/logout', { method:'POST', headers:{ 'Authorization': authToken } }); } catch {}
       localStorage.removeItem('authToken'); 
       localStorage.removeItem('gameSession');
+      authToken = null;
+      currentUser = null;
+      stopHeartbeat();
       location.reload();
     };
 
@@ -398,6 +505,7 @@
     leaveRoomBtn.onclick = async () => {
       if (!sessionId) return;
       if (!confirm('Are you sure you want to leave the room?')) return;
+      stopHeartbeat();  // NEW: Stop heartbeat when leaving
       try {
         await api.json('/api/leave', { method:'POST', headers:{ 'Authorization': authToken }, body: JSON.stringify({ session_id: sessionId }) });
         sessionId = null;
@@ -475,6 +583,7 @@
         document.getElementById('leaveRoomBtn').style.display = 'block';
         updatePlayers(data.players);
         startPolling();
+        startHeartbeat();  // NEW: Start heartbeat when joining
         showNotification(`Joined room: ${roomId}`, 'success');
       } catch (e){ showNotification(e.message || 'Failed to join room','error'); }
     }
@@ -633,6 +742,21 @@
         case 'chat_message': 
           addChatMessage(event.data.author, event.data.message); 
           break;
+        // ENHANCED: New event handlers for game pause/resume
+        case 'game_paused':
+          showNotification(event.data.message, 'warning');
+          addChatMessage('System', event.data.message);
+          // Disable card playing during pause
+          document.getElementById('playerHand').style.opacity = '0.5';
+          document.getElementById('playerHand').style.pointerEvents = 'none';
+          break;
+        case 'game_resumed':
+          showNotification(event.data.message, 'success');
+          addChatMessage('System', event.data.message);
+          // Re-enable card playing
+          document.getElementById('playerHand').style.opacity = '1';
+          document.getElementById('playerHand').style.pointerEvents = 'auto';
+          break;
       }
     }
 
@@ -651,6 +775,10 @@
         if (ok) {
           await showGameApp();
           await checkForReconnection();
+        } else {
+          // Token invalid, clear it
+          localStorage.removeItem('authToken');
+          authToken = null;
         }
       }
       setInterval(() => { if (currentUser && !currentRoomId) loadRooms(); }, 10000);

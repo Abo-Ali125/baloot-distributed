@@ -5,7 +5,7 @@ ENGR4450 - Distributed Systems Project
 
 NEW FEATURES:
 - Game pauses when player disconnects (60s wait)
-- Full game state persistence in database
+- Full game state persistence in the database
 - Enhanced reconnection with complete state restore
 - Heartbeat monitoring for connection health
 """
@@ -15,6 +15,7 @@ import logging
 import os
 import secrets
 import json
+
 from pathlib import Path
 from datetime import datetime, timedelta
 from threading import Lock, Timer
@@ -39,9 +40,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///baloot.db')
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+    
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
@@ -86,6 +89,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
     display_name = db.Column(db.String(100))
+    
     avatar_url = db.Column(db.String(200))
     bio = db.Column(db.Text)
     games_played = db.Column(db.Integer, default=0)
@@ -93,6 +97,7 @@ class User(db.Model):
     total_points = db.Column(db.Integer, default=0)
     win_rate = db.Column(db.Float, default=0.0)
     level = db.Column(db.Integer, default=1)
+    
     experience = db.Column(db.Integer, default=0)
     auth_token = db.Column(db.String(64), unique=True, index=True)
     token_expires = db.Column(db.DateTime)
@@ -136,6 +141,7 @@ class Friendship(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     friend_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String(20), default='pending')
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', foreign_keys=[user_id], backref='friendships_sent')
     friend = db.relationship('User', foreign_keys=[friend_id], backref='friendships_received')
@@ -151,7 +157,7 @@ class GameSession(db.Model):
     last_activity = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
     
-    # ENHANCED: Store complete game state
+    # This will storethe complete game state
     game_state = db.Column(db.Text)  # JSON: game_state, round_count, etc.
     player_hand = db.Column(db.Text)  # JSON: player's cards
     current_trick = db.Column(db.Text)  # JSON: cards in current trick
@@ -161,7 +167,7 @@ class GameSession(db.Model):
     trick_count = db.Column(db.Integer, default=0)
     round_number = db.Column(db.Integer, default=1)
 
-# Auth helpers
+# Auth helper
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -200,7 +206,7 @@ def broadcast_event(room_id: str, event_type: str, data: dict) -> None:
             logger.info(f"Event: {event_type} in room {room_id}")
 
 def save_game_state_to_db(room: Room, room_id: str):
-    """ENHANCED: Save complete game state to database for all players"""
+    """ Save complete game state to database for all players"""
     try:
         if not room.game:
             return
@@ -252,7 +258,8 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
         'message': f'⏸️ Game paused. Waiting {RECONNECT_WAIT_TIME}s for {player_name} to reconnect...'
     })
     
-    # Set timer to auto-resume if no reconnection
+    # *DONT FORGET to: Set timer to auto-resume if no reconnection
+    
     def timeout_handler():
         if room_id in paused_rooms:
             del paused_rooms[room_id]
@@ -300,7 +307,7 @@ def index():
             client_path = current_dir / candidate
             if client_path.exists():
                 html_content = client_path.read_text(encoding='utf-8')
-                response = make_response(html_content)
+                    response = make_response(html_content)
                 response.headers['Content-Type'] = 'text/html'
                 return response
         return jsonify({'error': 'Client file not found'}), 404
@@ -312,19 +319,23 @@ def index():
 def register():
     try:
         data = request.get_json(force=True)
+        
         username = (data.get('username') or '').strip()
         email = (data.get('email') or '').strip()
         password = data.get('password') or ''
         
         if not username or len(username) < 3:
             return jsonify({'error': 'Username must be at least 3 characters'}), 400
+            
         if not email or '@' not in email:
             return jsonify({'error': 'Valid email required'}), 400
+            
         if not password or len(password) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
         if User.query.filter_by(username=username).first():
             return jsonify({'error': 'Username already taken'}), 400
+            
         if User.query.filter_by(email=email).first():
             return jsonify({'error': 'Email already registered'}), 400
         
@@ -376,34 +387,34 @@ def login():
         user.last_login = datetime.utcnow()
         auth_token = user.generate_auth_token()
         
-        response = make_response(jsonify({
-            'success': True,
-            'auth_token': auth_token,
-            'user': user.to_dict()
+response = make_response(jsonify({
+'success': True,
+'auth_token': auth_token,
+'user': user.to_dict()
         }))
-        response.set_cookie('auth_token', auth_token,
-                          max_age=30*24*60*60,
-                          httponly=True,
-                          samesite='Lax')
-        return response, 200
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return jsonify({'error': 'Login failed'}), 500
+response.set_cookie('auth_token', auth_token,
+max_age=30*24*60*60,
+httponly=True,
+samesite='Lax')
+return response, 200
+except Exception as e:
+logger.error(f"Login error: {e}")
+return jsonify({'error': 'Login failed'}), 500
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
-    try:
-        request.current_user.auth_token = None
-        request.current_user.token_expires = None
-        db.session.commit()
+try:
+request.current_user.auth_token = None
+request.current_user.token_expires = None
+db.session.commit()
         
-        response = make_response(jsonify({'success': True}))
-        response.set_cookie('auth_token', '', expires=0)
-        return response, 200
-    except Exception as e:
-        logger.error(f"Logout error: {e}")
-        return jsonify({'error': 'Logout failed'}), 500
+response = make_response(jsonify({'success': True}))
+response.set_cookie('auth_token', '', expires=0)
+return response, 200
+except Exception as e:
+logger.error(f"Logout error: {e}")
+return jsonify({'error': 'Logout failed'}), 500
 
 @app.route('/api/profile', methods=['GET'])
 @login_required
@@ -525,7 +536,8 @@ def add_friend():
 @app.route('/api/reconnect', methods=['POST'])
 @login_required
 def reconnect():
-    """ENHANCED: Reconnect with complete state restoration"""
+    
+    """ Reconnect with complete state restoration"""
     try:
         data = request.get_json(force=True)
         old_session_id = data.get('session_id')
@@ -580,7 +592,7 @@ def reconnect():
                 'user_id': request.current_user.id
             }
         
-        # ENHANCED: Build complete state response
+        # Build complete state response
         game_state_response = {
             'session_id': new_session_id,
             'seat': seat,
@@ -620,7 +632,7 @@ def reconnect():
 @app.route('/api/leave', methods=['POST'])
 @login_required
 def leave_room():
-    """ENHANCED: Handle player leaving with game pause"""
+    """Handle player leaving with game pause"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -782,7 +794,7 @@ def player_ready():
                     'round_number': room.round_count,
                 })
                 
-                # Deal cards and save state
+    # Deal cards and save state
                 for s in range(4):
                     if room.players[s]:
                         broadcast_event(room_id, 'cards_dealt', {
@@ -790,7 +802,7 @@ def player_ready():
                             'cards': room.game.hands[s]
                         })
                 
-                # Save initial game state
+            # Save initial game state
                 save_game_state_to_db(room, room_id)
         
         return jsonify({'success': True}), 200
@@ -821,7 +833,8 @@ def send_chat_message():
             'author': player_name,
             'message': message,
             'timestamp': time.time()
-        })
+        }
+    )
         
         return jsonify({'success': True}), 200
     except Exception as e:
@@ -869,7 +882,7 @@ def poll_events():
 @app.route('/api/play_card', methods=['POST'])
 @login_required
 def play_card_enhanced():
-    """ENHANCED: Check if game is paused before allowing play"""
+    """ Check if game is paused before allowing play"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -966,7 +979,8 @@ def play_card_enhanced():
 @app.route('/api/heartbeat', methods=['POST'])
 @login_required
 def heartbeat():
-    """ENHANCED: Keep session alive and check for disconnections"""
+    
+    """Keep session alive and check for disconnections(heartbeat system we mentioned)"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')

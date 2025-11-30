@@ -71,7 +71,6 @@ cd baloot-game
 
 # Create virtual environment
 python -m venv venv
-# Activate virtual environment
 
 # Install dependencies
 pip install -r requirements.txt

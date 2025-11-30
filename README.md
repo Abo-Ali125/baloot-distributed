@@ -63,20 +63,3 @@ Prerequisites
 Python 3.9 or higher
 pip package manager
 Git
-
-Local
-# Clone the repository
-git clone https://github.com/Abo-Ali125/baloot-distributed.git
-cd baloot-game
-
-# Create virtual environment
-python -m venv venv
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Initialize database
-python -c "from server import app, db; app.app_context().push(); db.create_all()"
-
-# Run the server
-python server.py

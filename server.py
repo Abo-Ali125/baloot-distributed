@@ -81,6 +81,7 @@ PORT = int(os.environ.get('PORT', 10000))
 
 SESSION_TIMEOUT = 300  # 5 minutes
 HEARTBEAT_INTERVAL = 30  # 30 seconds
+
 RECONNECT_WAIT_TIME = 60  # 60 seconds to wait for reconnection
 
 # Database Models
@@ -90,9 +91,12 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    
     password_hash = db.Column(db.String(200), nullable=False)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
+    
     display_name = db.Column(db.String(100))
     
     avatar_url = db.Column(db.String(200))
@@ -128,6 +132,7 @@ class User(db.Model):
         """Generate and save a new auth token"""
         self.auth_token = secrets.token_urlsafe(32)
         self.token_expires = datetime.utcnow() + timedelta(days=30)
+        
         db.session.commit()
         return self.auth_token
 
@@ -231,12 +236,15 @@ def save_game_state_to_db(room: Room, room_id: str):
                 game_session.game_state = room.game_state.value
                 game_session.player_hand = json.dumps(room.game.hands.get(seat, []))
                 game_session.current_trick = json.dumps([
+                    
                     {'seat': s, 'card': c} for s, c in room.game.current_trick
                 ])
                 game_session.team_scores = json.dumps(room.game.team_scores)
                 game_session.total_scores = json.dumps(room.total_scores)
+                
                 game_session.current_player = room.game.current_player
                 game_session.trick_count = room.game.trick_count
+                
                 game_session.round_number = room.round_count
                 game_session.last_activity = datetime.utcnow()
         
@@ -249,7 +257,7 @@ def save_game_state_to_db(room: Room, room_id: str):
 def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: str):
     """Pause game and wait for player to reconnect"""
     if room_id in paused_rooms:
-        return  # Already paused
+        return  # Already paused 
     
     paused_rooms[room_id] = {
         'seat': disconnected_seat,
@@ -352,8 +360,8 @@ def register():
             avatar_url=f"https://ui-avatars.com/api/?name={username}&background=random",
         )
         db.session.add(user)
+      
         db.session.commit()
-        
         auth_token = user.generate_auth_token()
         
         response = make_response(jsonify({
@@ -598,6 +606,7 @@ def reconnect():
             player_sessions[new_session_id] = {
                 'player': player,
                 'room_id': room_id,
+                
                 'seat': seat,
                 'user_id': request.current_user.id
             }
@@ -608,6 +617,7 @@ def reconnect():
             'seat': seat,
             'room_state': room.get_state(),
             'players': room.get_players_info(),
+            
             'game_state': game_session.game_state,
             'round_number': game_session.round_number,
             'trick_count': game_session.trick_count,
@@ -621,6 +631,7 @@ def reconnect():
                 
                 game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
+                
                 game_state_response['current_player'] = game_session.current_player
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding game state: {e}")
@@ -790,12 +801,16 @@ def player_ready():
             
             player = session_data['player']
             player.is_ready = True
+
+            
             player.update_activity()
         
         broadcast_event(room_id, 'player_ready', {
             'seat': seat,
             'player_name': player.name,
+            
             'ready': True,
+            
             'players': room.get_players_info()
         })
         
@@ -827,7 +842,9 @@ def player_ready():
 def send_chat_message():
     try:
         data = request.get_json(force=True)
+        
         session_id = data.get('session_id')
+        
         message = (data.get('message') or '').strip()
         
         if not message:

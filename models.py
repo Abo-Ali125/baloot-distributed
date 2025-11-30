@@ -83,5 +83,4 @@ class Room:
             'players': self.get_players_info(),
             'game_state': self.game_state.value,
             'total_scores': self.total_scores,
-            'round_count': self.round_count,
-        }
+            'round_count': self.round_count,}

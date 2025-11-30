@@ -302,7 +302,6 @@ def resume_game_after_reconnect(room_id: str):
     
     logger.info(f"Game resumed in room {room_id}")
 
-# Routes
 @app.route('/')
 def index():
     """Serve the main game client"""
@@ -312,7 +311,7 @@ def index():
             client_path = current_dir / candidate
             if client_path.exists():
                 html_content = client_path.read_text(encoding='utf-8')
-                    response = make_response(html_content)
+                response = make_response(html_content)
                 response.headers['Content-Type'] = 'text/html'
                 return response
         return jsonify({'error': 'Client file not found'}), 404

@@ -302,6 +302,7 @@ def resume_game_after_reconnect(room_id: str):
     
     logger.info(f"Game resumed in room {room_id}")
 
+# Routes
 @app.route('/')
 def index():
     """Serve the main game client"""
@@ -391,36 +392,36 @@ def login():
         user.last_login = datetime.utcnow()
         auth_token = user.generate_auth_token()
         
-response = make_response(jsonify({
-'success': True,
-'auth_token': auth_token,
-'user': user.to_dict()
+        response = make_response(jsonify({
+            'success': True,
+            'auth_token': auth_token,
+            'user': user.to_dict()
         }))
-response.set_cookie('auth_token', auth_token,
-max_age=30*24*60*60,
-httponly=True,
-samesite='Lax')
-
-return response, 200
-except Exception as e:
-logger.error(f"Login error: {e}")
-return jsonify({'error': 'Login failed'}), 500
+        response.set_cookie('auth_token', auth_token,
+                          max_age=30*24*60*60,
+                          httponly=True,
+                          samesite='Lax')
+        
+        return response, 200
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({'error': 'Login failed'}), 500
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
-try:
-request.current_user.auth_token = None
-request.current_user.token_expires = None
-db.session.commit()
+    try:
+        request.current_user.auth_token = None
+        request.current_user.token_expires = None
+        db.session.commit()
         
-response = make_response(jsonify({'success': True}))
-response.set_cookie('auth_token', '', expires=0)
-
-return response, 200
-except Exception as e:
-logger.error(f"Logout error: {e}")
-return jsonify({'error': 'Logout failed'}), 500
+        response = make_response(jsonify({'success': True}))
+        response.set_cookie('auth_token', '', expires=0)
+        
+        return response, 200
+    except Exception as e:
+        logger.error(f"Logout error: {e}")
+        return jsonify({'error': 'Logout failed'}), 500
 
 @app.route('/api/profile', methods=['GET'])
 @login_required
@@ -805,7 +806,7 @@ def player_ready():
                     'round_number': room.round_count,
                 })
                 
-    # Deal cards and save state
+                # Deal cards and save state
                 for s in range(4):
                     if room.players[s]:
                         broadcast_event(room_id, 'cards_dealt', {
@@ -813,7 +814,7 @@ def player_ready():
                             'cards': room.game.hands[s]
                         })
                 
-            # Save initial game state
+                # Save initial game state
                 save_game_state_to_db(room, room_id)
         
         return jsonify({'success': True}), 200
@@ -844,8 +845,7 @@ def send_chat_message():
             'author': player_name,
             'message': message,
             'timestamp': time.time()
-        }
-    )
+        })
         
         return jsonify({'success': True}), 200
     except Exception as e:
@@ -921,6 +921,7 @@ def play_card_enhanced():
             
             if room.game.current_player != seat:
                 curr_player = room.players[room.game.current_player]
+                
                 current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
                 return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
             
@@ -936,12 +937,14 @@ def play_card_enhanced():
         broadcast_event(room_id, 'card_played', {
             'seat': seat,
             'player_name': player_name,
+            
             'card': card,
             'current_trick': [{
                 'seat': s,
                 'card': c,
                 'player': room.players[s].name if room.players[s] else f"Player {s+1}",
             } for s, c in room.game.current_trick],
+            
             'next_player': room.game.current_player,
             'next_player_name': room.players[room.game.current_player].name if room.players[room.game.current_player] else None,
         })
@@ -1016,6 +1019,7 @@ def heartbeat():
                 room_id = player_sessions[session_id]['room_id']
                 with rooms_lock:
                     room = rooms.get(room_id)
+                    
                     if room and room.game_state == GameState.IN_PROGRESS:
                         for seat, player in room.players.items():
                             if player and player.is_disconnected(60):
@@ -1039,6 +1043,7 @@ def handle_round_end(room: Room, room_id: str) -> None:
     if final_scores['team_a'] > final_scores['team_b']:
         round_winner = 'Team A'
         winning_score = final_scores['team_a']
+        
     elif final_scores['team_b'] > final_scores['team_a']:
         round_winner = 'Team B'
         winning_score = final_scores['team_b']
@@ -1060,6 +1065,7 @@ def handle_round_end(room: Room, room_id: str) -> None:
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         broadcast_event(room_id, 'game_complete', {
+            
             'game_winner': game_winner,
             'final_total_scores': room.total_scores
         })
@@ -1096,6 +1102,7 @@ def update_player_stats(room: Room, game_winner: str) -> None:
         db.session.commit()
         logger.info(f"Updated stats for game in room {room.room_id}")
     except Exception as e:
+        
         logger.error(f"Error updating player stats: {e}")
         db.session.rollback()
 
@@ -1117,11 +1124,13 @@ def start_new_round(room: Room, room_id: str) -> None:
 @app.errorhandler(404)
 def _json_404(e):
     if request.path.startswith('/api/'):
+        
         return jsonify({'error': 'Not found', 'path': request.path}), 404
     return e
 
 @app.errorhandler(405)
 def _json_405(e):
+    
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Method not allowed', 'path': request.path}), 405
     return e
@@ -1130,6 +1139,7 @@ def _json_405(e):
 def _json_500(e):
     if request.path.startswith('/api/'):
         code = 500
+        
         if isinstance(e, HTTPException):
             code = e.code or 500
         return jsonify({'error': 'Server error', 'detail': str(e)}), code

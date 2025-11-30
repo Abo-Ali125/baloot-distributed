@@ -3,10 +3,10 @@ Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
 ENGR4450 - Distributed Systems Project
 
-NEW FEATURES:
+NEW FEATURES FOR WEEK (14):
 - Game pauses when player disconnects (60s wait)
 - Full game state persistence in the database
-- Enhanced reconnection with complete state restore
+- reconnection with complete state restore
 - Heartbeat monitoring for connection health
 """
 import uuid
@@ -25,6 +25,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, session, make_response
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException
 
@@ -66,8 +67,10 @@ player_sessions = {}
 sessions_lock = Lock()
 events_queue = {}
 events_lock = Lock()
+
 user_sessions = {}
 user_sessions_lock = Lock()
+
 reconnect_timers = {}  # Track reconnection timers
 paused_rooms = {}  # Track paused rooms
 
@@ -75,6 +78,7 @@ paused_rooms = {}  # Track paused rooms
 MAX_PLAYERS_PER_ROOM = 4
 MAX_EVENTS_PER_ROOM = 200
 PORT = int(os.environ.get('PORT', 10000))
+
 SESSION_TIMEOUT = 300  # 5 minutes
 HEARTBEAT_INTERVAL = 30  # 30 seconds
 RECONNECT_WAIT_TIME = 60  # 60 seconds to wait for reconnection
@@ -82,6 +86,7 @@ RECONNECT_WAIT_TIME = 60  # 60 seconds to wait for reconnection
 # Database Models
 class User(db.Model):
     """User account model with persistent data"""
+    
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -147,7 +152,7 @@ class Friendship(db.Model):
     friend = db.relationship('User', foreign_keys=[friend_id], backref='friendships_received')
 
 class GameSession(db.Model):
-    """ENHANCED: Persistent game session with full game state"""
+    """Persistent game session with full game state"""
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -242,7 +247,7 @@ def save_game_state_to_db(room: Room, room_id: str):
         db.session.rollback()
 
 def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: str):
-    """ENHANCED: Pause game and wait for player to reconnect"""
+    """Pause game and wait for player to reconnect"""
     if room_id in paused_rooms:
         return  # Already paused
     
@@ -258,7 +263,7 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
         'message': f'⏸️ Game paused. Waiting {RECONNECT_WAIT_TIME}s for {player_name} to reconnect...'
     })
     
-    # *DONT FORGET to: Set timer to auto-resume if no reconnection
+    # *DONT FORGET to: Set timer to auto-Disconnect if no reconnection
     
     def timeout_handler():
         if room_id in paused_rooms:
@@ -282,7 +287,7 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
     logger.info(f"Game paused in room {room_id}, waiting for {player_name}")
 
 def resume_game_after_reconnect(room_id: str):
-    """ENHANCED: Resume game after successful reconnection"""
+    """Resume game after successful reconnection"""
     if room_id in paused_rooms:
         del paused_rooms[room_id]
     
@@ -396,6 +401,7 @@ response.set_cookie('auth_token', auth_token,
 max_age=30*24*60*60,
 httponly=True,
 samesite='Lax')
+
 return response, 200
 except Exception as e:
 logger.error(f"Login error: {e}")
@@ -411,6 +417,7 @@ db.session.commit()
         
 response = make_response(jsonify({'success': True}))
 response.set_cookie('auth_token', '', expires=0)
+
 return response, 200
 except Exception as e:
 logger.error(f"Logout error: {e}")
@@ -430,13 +437,16 @@ def update_profile():
         
         if 'display_name' in data:
             user.display_name = (data['display_name'] or '')[:100]
+            
         if 'bio' in data:
             user.bio = (data['bio'] or '')[:500]
+            
         if 'avatar_url' in data:
             user.avatar_url = (data['avatar_url'] or '')[:200]
         
         db.session.commit()
         return jsonify(user.to_dict()), 200
+        
     except Exception as e:
         logger.error(f"Profile update error: {e}")
         db.session.rollback()
@@ -608,6 +618,7 @@ def reconnect():
             try:
                 game_state_response['hand'] = json.loads(game_session.player_hand) if game_session.player_hand else []
                 game_state_response['current_trick'] = json.loads(game_session.current_trick) if game_session.current_trick else []
+                
                 game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['current_player'] = game_session.current_player
@@ -625,6 +636,7 @@ def reconnect():
         
         logger.info(f"Player {player.name} reconnected to room {room_id}")
         return jsonify(game_state_response), 200
+        
     except Exception as e:
         logger.error(f"Reconnect error: {e}")
         return jsonify({'error': 'Reconnection failed'}), 500

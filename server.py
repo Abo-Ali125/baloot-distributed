@@ -3,7 +3,6 @@ Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
 ENGR4450 - Distributed Systems Project
 
-
 """
 import uuid
 import time
@@ -534,7 +533,7 @@ def add_friend():
         friendship = Friendship(
             user_id=request.current_user.id,
             friend_id=friend.id,
-            status='pending'  # Changed from 'accepted' to 'pending'
+            status='pending'  # FIXED: Changed from 'accepted' to 'pending'
         )
         db.session.add(friendship)
         db.session.commit()
@@ -550,7 +549,7 @@ def add_friend():
 @app.route('/api/friends/requests', methods=['GET'])
 @login_required
 def get_friend_requests():
-    """Get pending friend requests"""
+    """ Get pending friend requests"""
     try:
         pending_requests = Friendship.query.filter_by(
             friend_id=request.current_user.id,
@@ -617,14 +616,13 @@ def accept_friend_request():
 @app.route('/api/friends/reject', methods=['POST'])
 @login_required
 def reject_friend_request():
-    """ Changed from auto-accept of request to pending approval mentioned above; after realizing player who gets added doesn't know he was added by someone until he refreshed: Reject a friend request"""
+    """Reject a friend request after sending carter a friend request and it got auto-accepted (because that's how we did it first) he didnt know until I told him, and he had to refresh, but the person sendign therequest  knew because it showed me """
     try:
         data = request.get_json(force=True)
         request_id = data.get('request_id')
         
         if not request_id:
             return jsonify({'error': 'Request ID required'}), 400
-        
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
@@ -708,6 +706,7 @@ def reconnect():
             'game_state': game_session.game_state,
             'round_number': game_session.round_number,
             'trick_count': game_session.trick_count,
+            'can_ready': room.game_state in [GameState.WAITING, GameState.READY] and room.is_full()
         }
         
         if game_session.game_state == 'IN_PROGRESS':
@@ -762,7 +761,7 @@ def leave_room():
             if room.game_state == GameState.IN_PROGRESS:
                 pause_game_for_reconnect(room_id, seat, player_name)
             else:
-                # Properly clear the seat  (We found this when testing; that Players who left couldn't join back because the room was not updating, basically showing 4/4 even though it was 3/4)
+                # Properly clear the seat
                 room.players[seat] = None
         
         game_session = GameSession.query.filter_by(
@@ -777,7 +776,7 @@ def leave_room():
         with sessions_lock:
             del player_sessions[session_id]
         
-        # Broadcast with updated player list 
+        # Broadcast with updated player list (After we tested, reconnection the room wouldnt update player count and couldn't rejoin because it was full )
         broadcast_event(room_id, 'player_left', {
             'player_name': player_name,
             'seat': seat,
@@ -810,7 +809,7 @@ def get_active_rooms():
 @app.route('/api/join', methods=['POST'])
 @login_required
 def join_room():
-    """Prevents duplicate joins from same account"""
+    """Prevents duplicate joins from same account (While testing Yann joined same room twice with same account and browser)"""
     try:
         data = request.get_json(force=True)
         room_id = data.get('room_id')
@@ -820,7 +819,7 @@ def join_room():
         
         room = get_or_create_room(room_id)
         
-        # Check if user already in room (Yann was able to join the same room twice with the same account and browser, and this is an issue we needed to fix asap)
+        # Check if user already in room
         with rooms_lock:
             for seat, player in room.players.items():
                 if player and player.user_id == request.current_user.id:
@@ -863,11 +862,15 @@ def join_room():
             'players': room.get_players_info()
         })
         
+        # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button if he disconnects before starting the game, after Yann left by mistake when we were about to test)
+        can_ready = room.game_state in [GameState.WAITING, GameState.READY] and room.is_full()
+        
         return jsonify({
             'session_id': session_id,
             'seat': seat,
             'room_state': room.get_state(),
-            'players': room.get_players_info()
+            'players': room.get_players_info(),
+            'can_ready': can_ready
         }), 200
     except Exception as e:
         logger.error(f"Join room error: {e}")
@@ -948,6 +951,7 @@ def send_chat_message():
         
         broadcast_event(room_id, 'chat_message', {
             'author': player_name,
+            
             'message': message,
             'timestamp': time.time()
         })
@@ -967,6 +971,7 @@ def poll_events():
         
         if not room_id:
             session_id = request.args.get('session_id')
+            
             with sessions_lock:
                 if session_id and session_id in player_sessions:
                     room_id = player_sessions[session_id]['room_id']

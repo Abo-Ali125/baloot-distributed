@@ -1,13 +1,8 @@
 """
-Baloot Game Server
+Baloot Game Server.Py
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
-ENGR4450 - Distributed Systems Project
+ENGR4450 - Distributed Systems Implementation Project
 
-NEW FEATURES FOR WEEK (14):
-- Game pauses when player disconnects (60s wait)
-- Full game state persistence in the database
-- reconnection with complete state restore
-- Heartbeat monitoring for connection health
 """
 import uuid
 import time
@@ -50,7 +45,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
 
-# Initialize database
+
 db = SQLAlchemy(app)
 
 # Configure logging
@@ -71,18 +66,18 @@ events_lock = Lock()
 user_sessions = {}
 user_sessions_lock = Lock()
 
-reconnect_timers = {}  # Track reconnection timers
-paused_rooms = {}  # Track paused rooms
+reconnect_timers = {}
+paused_rooms = {}
 
 # Game constants
 MAX_PLAYERS_PER_ROOM = 4
 MAX_EVENTS_PER_ROOM = 200
 PORT = int(os.environ.get('PORT', 10000))
 
-SESSION_TIMEOUT = 300  # 5 minutes
-HEARTBEAT_INTERVAL = 30  # 30 seconds
+SESSION_TIMEOUT = 300
+HEARTBEAT_INTERVAL = 30
 
-RECONNECT_WAIT_TIME = 60  # 60 seconds to wait for reconnection
+RECONNECT_WAIT_TIME = 60
 
 # Database Models
 class User(db.Model):
@@ -100,11 +95,11 @@ class User(db.Model):
     display_name = db.Column(db.String(100))
     
     avatar_url = db.Column(db.String(200))
-    bio = db.Column(db.Text)
-    games_played = db.Column(db.Integer, default=0)
-    games_won = db.Column(db.Integer, default=0)
-    total_points = db.Column(db.Integer, default=0)
-    win_rate = db.Column(db.Float, default=0.0)
+        bio = db.Column(db.Text)
+            games_played = db.Column(db.Integer, default=0)
+                games_won = db.Column(db.Integer, default=0)
+            total_points = db.Column(db.Integer, default=0)
+        win_rate = db.Column(db.Float, default=0.0)
     level = db.Column(db.Integer, default=1)
     
     experience = db.Column(db.Integer, default=0)
@@ -158,22 +153,22 @@ class Friendship(db.Model):
 
 class GameSession(db.Model):
     """Persistent game session with full game state"""
+    
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    room_id = db.Column(db.String(100))
-    seat = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+        session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
+            user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+            room_id = db.Column(db.String(100))
+            seat = db.Column(db.Integer)
+            created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        last_activity = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
     
-    # This will storethe complete game state
-    game_state = db.Column(db.Text)  # JSON: game_state, round_count, etc.
-    player_hand = db.Column(db.Text)  # JSON: player's cards
-    current_trick = db.Column(db.Text)  # JSON: cards in current trick
-    team_scores = db.Column(db.Text)  # JSON: team_a, team_b
-    total_scores = db.Column(db.Text)  # JSON: cumulative scores
-    current_player = db.Column(db.Integer)  # Who's turn
+    game_state = db.Column(db.Text)
+    player_hand = db.Column(db.Text)
+    current_trick = db.Column(db.Text)
+    team_scores = db.Column(db.Text)
+    total_scores = db.Column(db.Text)
+    current_player = db.Column(db.Integer)
     trick_count = db.Column(db.Integer, default=0)
     round_number = db.Column(db.Integer, default=1)
 
@@ -232,11 +227,9 @@ def save_game_state_to_db(room: Room, room_id: str):
             ).first()
             
             if game_session:
-                # Save complete state
                 game_session.game_state = room.game_state.value
                 game_session.player_hand = json.dumps(room.game.hands.get(seat, []))
                 game_session.current_trick = json.dumps([
-                    
                     {'seat': s, 'card': c} for s, c in room.game.current_trick
                 ])
                 game_session.team_scores = json.dumps(room.game.team_scores)
@@ -257,7 +250,7 @@ def save_game_state_to_db(room: Room, room_id: str):
 def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: str):
     """Pause game and wait for player to reconnect"""
     if room_id in paused_rooms:
-        return  # Already paused 
+        return
     
     paused_rooms[room_id] = {
         'seat': disconnected_seat,
@@ -271,21 +264,17 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
         'message': f'⏸️ Game paused. Waiting {RECONNECT_WAIT_TIME}s for {player_name} to reconnect...'
     })
     
-    # *DONT FORGET to: Set timer to auto-Disconnect if no reconnection
-    
     def timeout_handler():
         if room_id in paused_rooms:
             del paused_rooms[room_id]
             with rooms_lock:
                 room = rooms.get(room_id)
                 if room:
-                    # Remove disconnected player
                     room.players[disconnected_seat] = None
                     broadcast_event(room_id, 'game_resumed', {
                         'reason': 'Reconnection timeout',
                         'message': f'❌ {player_name} did not reconnect. Game ending...'
                     })
-                    # End the game
                     room.game_state = GameState.FINISHED
     
     timer = Timer(RECONNECT_WAIT_TIME, timeout_handler)
@@ -336,21 +325,21 @@ def register():
         username = (data.get('username') or '').strip()
         email = (data.get('email') or '').strip()
         password = data.get('password') or ''
-        
         if not username or len(username) < 3:
-            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        return jsonify({'error': 'Username must be at least 3 characters'}), 400
             
         if not email or '@' not in email:
-            return jsonify({'error': 'Valid email required'}), 400
+        return jsonify({'error': 'Valid email required'}), 400
             
         if not password or len(password) < 6:
-            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
         if User.query.filter_by(username=username).first():
-            return jsonify({'error': 'Username already taken'}), 400
-            
+        return jsonify({'error': 'Username already taken'}), 400
+
+        
         if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email already registered'}), 400
+        return jsonify({'error': 'Email already registered'}), 400
         
         user = User(
             username=username,
@@ -445,11 +434,11 @@ def update_profile():
         
         if 'display_name' in data:
             user.display_name = (data['display_name'] or '')[:100]
-            
         if 'bio' in data:
             user.bio = (data['bio'] or '')[:500]
             
         if 'avatar_url' in data:
+          
             user.avatar_url = (data['avatar_url'] or '')[:200]
         
         db.session.commit()
@@ -464,18 +453,18 @@ def update_profile():
 def get_leaderboard():
     top_players = User.query.order_by(
         User.level.desc(),
-        User.win_rate.desc(),
+            User.win_rate.desc(),
         User.total_points.desc()
     ).limit(20).all()
     
     return jsonify([{
         'rank': i + 1,
         'username': p.username,
-        'display_name': p.display_name or p.username,
-        'level': p.level,
-        'games_played': p.games_played,
-        'games_won': p.games_won,
-        'win_rate': p.win_rate,
+            'display_name': p.display_name or p.username,
+            'level': p.level,
+            'games_played': p.games_played,
+            'games_won': p.games_won,
+            'win_rate': p.win_rate,
         'total_points': p.total_points,
     } for i, p in enumerate(top_players)]), 200
 
@@ -505,6 +494,7 @@ def get_friends():
             'id': friend.id,
             'username': friend.username,
             'display_name': friend.display_name or friend.username,
+            
             'avatar_url': friend.avatar_url,
             'level': friend.level,
             'online': is_online,
@@ -515,6 +505,7 @@ def get_friends():
 @app.route('/api/friends/add', methods=['POST'])
 @login_required
 def add_friend():
+    """ Creates pending friend request instead of auto-accepting"""
     try:
         data = request.get_json(force=True)
         friend_username = data.get('username')
@@ -530,38 +521,148 @@ def add_friend():
             or_(
                 and_(Friendship.user_id == request.current_user.id,
                      Friendship.friend_id == friend.id),
+                
                 and_(Friendship.user_id == friend.id,
                      Friendship.friend_id == request.current_user.id),
             )
         ).first()
         
         if existing:
-            return jsonify({'error': 'Friend request already exists'}), 400
+            if existing.status == 'pending':
+                return jsonify({'error': 'Friend request already pending'}), 400
+            elif existing.status == 'accepted':
+                return jsonify({'error': 'Already friends'}), 400
         
         friendship = Friendship(
             user_id=request.current_user.id,
             friend_id=friend.id,
-            status='accepted'
+            status='pending'  # Changed from 'accepted' to 'pending'
         )
         db.session.add(friendship)
         db.session.commit()
-        return jsonify({'success': True}), 200
+        
+        logger.info(f"Friend request sent from {request.current_user.username} to {friend_username}")
+        return jsonify({'success': True, 'message': 'Friend request sent'}), 200
     except Exception as e:
         logger.error(f"Add friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to add friend'}), 500
 
+
+@app.route('/api/friends/requests', methods=['GET'])
+@login_required
+def get_friend_requests():
+    """Get pending friend requests"""
+    try:
+        pending_requests = Friendship.query.filter_by(
+            friend_id=request.current_user.id,
+            status='pending'
+        ).all()
+        
+        requests_list = []
+        for req in pending_requests:
+            sender = User.query.get(req.user_id)
+            if sender:
+                requests_list.append({
+                    'request_id': req.id,
+                    'from_user_id': sender.id,
+                    'from_username': sender.username,
+                    
+                    'from_display_name': sender.display_name or sender.username,
+                    'from_avatar_url': sender.avatar_url,
+                    'from_level': sender.level,
+                    'sent_at': req.created_at.isoformat() if req.created_at else None
+                }
+                                    )
+        
+        return jsonify(requests_list), 200
+    except Exception as e:
+        
+        logger.error(f"Get friend requests error: {e}")
+        return jsonify({'error': 'Failed to get friend requests'}), 500
+
+
+@app.route('/api/friends/accept', methods=['POST'])
+@login_required
+def accept_friend_request():
+    """ Accept a friend request"""
+    try:
+        data = request.get_json(force=True)
+        request_id = data.get('request_id')
+        
+        if not request_id:
+        return jsonify({'error': 'Request ID required'}), 400
+        
+        friendship = Friendship.query.get(request_id)
+        if not friendship:
+            return jsonify({'error': 'Friend request not found'}), 404
+        
+        if friendship.friend_id != request.current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+        if friendship.status != 'pending':
+        return jsonify({'error': 'Request already processed'}), 400
+        
+        friendship.status = 'accepted'
+        db.session.commit()
+        
+        sender = User.query.get(friendship.user_id)
+        logger.info(f"Friend request accepted: {sender.username} and {request.current_user.username}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'You are now friends with {sender.display_name or sender.username}'
+        }), 200
+    except Exception as e:
+        logger.error(f"Accept friend error: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to accept friend request'}), 500
+
+
+@app.route('/api/friends/reject', methods=['POST'])
+@login_required
+def reject_friend_request():
+    """Put this in, ISSUE FACED; as it was an auto accept process where when i sent an invite i was automaticaly ur friend but the issue was the other person didnt know until he refreshed or logged out and logged back in:  Reject a friend request"""
+    try:
+        data = request.get_json(force=True)
+        request_id = data.get('request_id')
+        
+        if not request_id:
+            return jsonify({'error': 'Request ID required'}), 400
+        
+        friendship = Friendship.query.get(request_id)
+        if not friendship:
+            return jsonify({'error': 'Friend request not found'}), 404
+        
+        if friendship.friend_id != request.current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        if friendship.status != 'pending':
+            return jsonify({'error': 'Request already processed'}), 400
+        
+        db.session.delete(friendship)
+        db.session.commit()
+        
+        logger.info(f"Friend request rejected by {request.current_user.username}")
+        
+        return jsonify({'success': True, 'message': 'Friend request rejected'}), 200
+    except Exception as e:
+        
+        logger.error(f"Reject friend error: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to reject friend request'}), 500
+
+
 @app.route('/api/reconnect', methods=['POST'])
 @login_required
 def reconnect():
     
-    """ Reconnect with complete state restoration"""
+    """Reconnect with complete state restoration"""
     try:
         data = request.get_json(force=True)
         old_session_id = data.get('session_id')
         room_id = data.get('room_id')
         
-        # Load game session from database
         game_session = GameSession.query.filter_by(
             user_id=request.current_user.id,
             room_id=room_id,
@@ -577,12 +678,10 @@ def reconnect():
         room = rooms[room_id]
         seat = game_session.seat
         
-        # Create new session
         new_session_id = str(uuid.uuid4())
         player = room.players[seat]
         
         if not player:
-            # Recreate player
             player = Player(
                 new_session_id,
                 request.current_user.display_name or request.current_user.username
@@ -594,24 +693,20 @@ def reconnect():
             player.session_id = new_session_id
             player.update_activity()
         
-        # Update game session
         game_session.session_id = new_session_id
         game_session.last_activity = datetime.utcnow()
         db.session.commit()
         
-        # Update in-memory sessions
         with sessions_lock:
             if old_session_id in player_sessions:
                 del player_sessions[old_session_id]
             player_sessions[new_session_id] = {
                 'player': player,
                 'room_id': room_id,
-                
                 'seat': seat,
                 'user_id': request.current_user.id
             }
         
-        # Build complete state response
         game_state_response = {
             'session_id': new_session_id,
             'seat': seat,
@@ -623,7 +718,6 @@ def reconnect():
             'trick_count': game_session.trick_count,
         }
         
-        # Restore from database if game in progress
         if game_session.game_state == 'IN_PROGRESS':
             try:
                 game_state_response['hand'] = json.loads(game_session.player_hand) if game_session.player_hand else []
@@ -631,12 +725,10 @@ def reconnect():
                 
                 game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
-                
                 game_state_response['current_player'] = game_session.current_player
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding game state: {e}")
         
-        # Resume game if it was paused
         if room_id in paused_rooms:
             resume_game_after_reconnect(room_id)
         
@@ -652,10 +744,11 @@ def reconnect():
         logger.error(f"Reconnect error: {e}")
         return jsonify({'error': 'Reconnection failed'}), 500
 
+
 @app.route('/api/leave', methods=['POST'])
 @login_required
 def leave_room():
-    """Handle player leaving with game pause"""
+    """Properly removes player and notifies others"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -675,17 +768,16 @@ def leave_room():
             
             player_name = session_data['player'].name
             
-            # If game is in progress, pause it
             if room.game_state == GameState.IN_PROGRESS:
                 pause_game_for_reconnect(room_id, seat, player_name)
-                # Don't remove player yet, give them time to reconnect
             else:
-                # Not in game, remove immediately
-                room.remove_player(session_id)
+                #  Had an issue where it said 4/4 even when someone left: Properly clear the seat
+                room.players[seat] = None
         
-        # Mark game session as inactive
         game_session = GameSession.query.filter_by(
-            session_id=session_id
+            session_id=session_id,
+            user_id=request.current_user.id,
+            is_active=True
         ).first()
         if game_session:
             game_session.is_active = False
@@ -694,16 +786,20 @@ def leave_room():
         with sessions_lock:
             del player_sessions[session_id]
         
+        # Broadcast with updated player list
         broadcast_event(room_id, 'player_left', {
             'player_name': player_name,
             'seat': seat,
             'players': room.get_players_info()
         })
         
+        logger.info(f"Player {player_name} left room {room_id} (seat {seat})")
+        
         return jsonify({'success': True}), 200
     except Exception as e:
         logger.error(f"Leave room error: {e}")
         return jsonify({'error': 'Failed to leave room'}), 500
+
 
 @app.route('/api/rooms', methods=['GET'])
 def get_active_rooms():
@@ -719,9 +815,11 @@ def get_active_rooms():
             })
     return jsonify(active_rooms), 200
 
+
 @app.route('/api/join', methods=['POST'])
 @login_required
 def join_room():
+    """Prevents duplicate joins from same account"""
     try:
         data = request.get_json(force=True)
         room_id = data.get('room_id')
@@ -730,6 +828,12 @@ def join_room():
             return jsonify({'error': 'Room ID required'}), 400
         
         room = get_or_create_room(room_id)
+        
+        # finally fixd:  Check if user already in room
+        with rooms_lock:
+            for seat, player in room.players.items():
+                if player and player.user_id == request.current_user.id:
+                    return jsonify({'error': 'You are already in this room'}), 400
         
         if room.is_full():
             return jsonify({'error': 'Room is full'}), 400
@@ -745,7 +849,6 @@ def join_room():
         if seat is None:
             return jsonify({'error': 'Could not join room'}), 400
         
-        # Save game session to database
         game_session = GameSession(
             session_id=session_id,
             user_id=request.current_user.id,
@@ -772,12 +875,14 @@ def join_room():
         return jsonify({
             'session_id': session_id,
             'seat': seat,
+            
             'room_state': room.get_state(),
             'players': room.get_players_info()
         }), 200
     except Exception as e:
         logger.error(f"Join room error: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/ready', methods=['POST'])
 @login_required
@@ -801,8 +906,6 @@ def player_ready():
             
             player = session_data['player']
             player.is_ready = True
-
-            
             player.update_activity()
         
         broadcast_event(room_id, 'player_ready', {
@@ -810,7 +913,6 @@ def player_ready():
             'player_name': player.name,
             
             'ready': True,
-            
             'players': room.get_players_info()
         })
         
@@ -821,7 +923,6 @@ def player_ready():
                     'round_number': room.round_count,
                 })
                 
-                # Deal cards and save state
                 for s in range(4):
                     if room.players[s]:
                         broadcast_event(room_id, 'cards_dealt', {
@@ -829,7 +930,6 @@ def player_ready():
                             'cards': room.game.hands[s]
                         })
                 
-                # Save initial game state
                 save_game_state_to_db(room, room_id)
         
         return jsonify({'success': True}), 200
@@ -837,14 +937,13 @@ def player_ready():
         logger.error(f"Ready error: {e}")
         return jsonify({'error': 'Failed to set ready status'}), 500
 
+
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def send_chat_message():
     try:
         data = request.get_json(force=True)
-        
         session_id = data.get('session_id')
-        
         message = (data.get('message') or '').strip()
         
         if not message:
@@ -869,6 +968,7 @@ def send_chat_message():
         logger.error(f"Chat error: {e}")
         return jsonify({'error': 'Failed to send message'}), 500
 
+
 @app.route('/api/poll', methods=['GET'])
 @login_required
 def poll_events():
@@ -879,6 +979,7 @@ def poll_events():
         if not room_id:
             session_id = request.args.get('session_id')
             with sessions_lock:
+                
                 if session_id and session_id in player_sessions:
                     room_id = player_sessions[session_id]['room_id']
         
@@ -907,10 +1008,12 @@ def poll_events():
         logger.error(f"Poll error: {e}")
         return jsonify({'error': 'Failed to poll events'}), 500
 
+
 @app.route('/api/play_card', methods=['POST'])
 @login_required
 def play_card_enhanced():
-    """ Check if game is paused before allowing play"""
+    
+    """Check if game is paused before allowing play"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
@@ -921,10 +1024,10 @@ def play_card_enhanced():
                 return jsonify({'error': 'Invalid session'}), 401
             
             session_data = player_sessions[session_id]
+            
             room_id = session_data['room_id']
             seat = session_data['seat']
         
-        # Check if game is paused
         if room_id in paused_rooms:
             return jsonify({'error': 'Game is paused, waiting for player to reconnect'}), 400
         
@@ -938,7 +1041,6 @@ def play_card_enhanced():
             
             if room.game.current_player != seat:
                 curr_player = room.players[room.game.current_player]
-                
                 current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
                 return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
             
@@ -948,20 +1050,17 @@ def play_card_enhanced():
             
             player_name = session_data['player'].name
         
-        # Save state after card played
         save_game_state_to_db(room, room_id)
         
         broadcast_event(room_id, 'card_played', {
             'seat': seat,
             'player_name': player_name,
-            
             'card': card,
             'current_trick': [{
                 'seat': s,
                 'card': c,
                 'player': room.players[s].name if room.players[s] else f"Player {s+1}",
             } for s, c in room.game.current_trick],
-            
             'next_player': room.game.current_player,
             'next_player_name': room.players[room.game.current_player].name if room.players[room.game.current_player] else None,
         })
@@ -981,7 +1080,6 @@ def play_card_enhanced():
                     'next_leader_name': winner_name,
                 })
                 
-                # Save state after trick resolved
                 save_game_state_to_db(room, room_id)
                 
                 cards_remaining = sum(len(hand) for hand in room.game.hands.values())
@@ -1007,16 +1105,15 @@ def play_card_enhanced():
         logger.error(f"Error in play_card: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/heartbeat', methods=['POST'])
 @login_required
 def heartbeat():
-    
-    """Keep session alive and check for disconnections(heartbeat system we mentioned)"""
+    """Keep session alive and check for disconnections"""
     try:
         data = request.get_json(force=True)
         session_id = data.get('session_id')
         
-        # Update game session activity
         game_session = GameSession.query.filter_by(
             session_id=session_id,
             user_id=request.current_user.id
@@ -1030,7 +1127,6 @@ def heartbeat():
             if session_id in player_sessions:
                 player_sessions[session_id]['player'].update_activity()
         
-        # Check for other disconnected players in the room
         with sessions_lock:
             if session_id in player_sessions:
                 room_id = player_sessions[session_id]['room_id']
@@ -1040,7 +1136,6 @@ def heartbeat():
                     if room and room.game_state == GameState.IN_PROGRESS:
                         for seat, player in room.players.items():
                             if player and player.is_disconnected(60):
-                                # Player hasn't sent heartbeat in 60s
                                 if room_id not in paused_rooms:
                                     pause_game_for_reconnect(room_id, seat, player.name)
         
@@ -1049,9 +1144,11 @@ def heartbeat():
         logger.error(f"Heartbeat error: {e}")
         return jsonify({'error': 'Heartbeat failed'}), 500
 
+
 @app.route('/health')
 def health():
     return jsonify({'status': 'healthy', 'timestamp': time.time()}), 200
+
 
 def handle_round_end(room: Room, room_id: str) -> None:
     """Handle end of round scoring and game progression"""
@@ -1064,6 +1161,7 @@ def handle_round_end(room: Room, room_id: str) -> None:
     elif final_scores['team_b'] > final_scores['team_a']:
         round_winner = 'Team B'
         winning_score = final_scores['team_b']
+        
     else:
         round_winner = 'Tie'
         winning_score = final_scores['team_a']
@@ -1082,7 +1180,6 @@ def handle_round_end(room: Room, room_id: str) -> None:
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         broadcast_event(room_id, 'game_complete', {
-            
             'game_winner': game_winner,
             'final_total_scores': room.total_scores
         })
@@ -1091,8 +1188,9 @@ def handle_round_end(room: Room, room_id: str) -> None:
     else:
         start_new_round(room, room_id)
 
+
 def update_player_stats(room: Room, game_winner: str) -> None:
-    """Update player statistics in database after game completes"""
+    """Update player statistics in database after game compltes"""
     try:
         winning_team_seats = [0, 2] if game_winner == 'Team A' else [1, 3]
         
@@ -1119,9 +1217,9 @@ def update_player_stats(room: Room, game_winner: str) -> None:
         db.session.commit()
         logger.info(f"Updated stats for game in room {room.room_id}")
     except Exception as e:
-        
         logger.error(f"Error updating player stats: {e}")
         db.session.rollback()
+
 
 def start_new_round(room: Room, room_id: str) -> None:
     """Prepare for next round"""
@@ -1138,6 +1236,7 @@ def start_new_round(room: Room, room_id: str) -> None:
         'message': f'Round {room.round_count} complete! Ready up for Round {room.round_count + 1}!'
     })
 
+
 @app.errorhandler(404)
 def _json_404(e):
     if request.path.startswith('/api/'):
@@ -1145,26 +1244,30 @@ def _json_404(e):
         return jsonify({'error': 'Not found', 'path': request.path}), 404
     return e
 
+
 @app.errorhandler(405)
 def _json_405(e):
-    
     if request.path.startswith('/api/'):
+        
         return jsonify({'error': 'Method not allowed', 'path': request.path}), 405
     return e
 
+
 @app.errorhandler(Exception)
 def _json_500(e):
+    
     if request.path.startswith('/api/'):
         code = 500
-        
         if isinstance(e, HTTPException):
             code = e.code or 500
         return jsonify({'error': 'Server error', 'detail': str(e)}), code
     raise e
 
+
 # Initialize database on startup
 with app.app_context():
     db.create_all()
+    
     logger.info("Database initialized")
 
 if __name__ == '__main__':

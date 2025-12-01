@@ -1,8 +1,14 @@
 """
-Baloot Game Server.Py
+Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
-ENGR4450 - Distributed Systems Implementation Project
+ENGR4450 - Distributed Systems Project
 
+FINAL VERSION - ALL FIXES APPLIED:
+- Friend requests require acceptance (pending status)
+- Players can rejoin after leaving (seat properly cleared)
+- Duplicate join prevention (same account can't join twice)
+- Leave notifications for all players
+- Cards properly removed from hand after playing
 """
 import uuid
 import time
@@ -34,9 +40,8 @@ CORS(app, supports_credentials=True, origins=['*'])
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///baloot.db')
-
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
     
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -46,13 +51,13 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
 
-
+# Initialize database
 db = SQLAlchemy(app)
 
 # Configure logging
 logging.basicConfig(
-level=logging.INFO,
-format='%(asctime)s %(levelname)s %(name)s %(message)s'
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -154,7 +159,6 @@ class Friendship(db.Model):
 
 class GameSession(db.Model):
     """Persistent game session with full game state"""
-    
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -326,21 +330,21 @@ def register():
         username = (data.get('username') or '').strip()
         email = (data.get('email') or '').strip()
         password = data.get('password') or ''
+        
         if not username or len(username) < 3:
-        return jsonify({'error': 'Username must be at least 3 characters'}), 400
+            return jsonify({'error': 'Username must be at least 3 characters'}), 400
             
         if not email or '@' not in email:
-        return jsonify({'error': 'Valid email required'}), 400
+            return jsonify({'error': 'Valid email required'}), 400
             
         if not password or len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
         if User.query.filter_by(username=username).first():
-        return jsonify({'error': 'Username already taken'}), 400
-
-        
+            return jsonify({'error': 'Username already taken'}), 400
+            
         if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
+            return jsonify({'error': 'Email already registered'}), 400
         
         user = User(
             username=username,
@@ -435,11 +439,11 @@ def update_profile():
         
         if 'display_name' in data:
             user.display_name = (data['display_name'] or '')[:100]
+            
         if 'bio' in data:
             user.bio = (data['bio'] or '')[:500]
             
         if 'avatar_url' in data:
-          
             user.avatar_url = (data['avatar_url'] or '')[:200]
         
         db.session.commit()
@@ -454,18 +458,18 @@ def update_profile():
 def get_leaderboard():
     top_players = User.query.order_by(
         User.level.desc(),
-            User.win_rate.desc(),
+        User.win_rate.desc(),
         User.total_points.desc()
     ).limit(20).all()
     
     return jsonify([{
         'rank': i + 1,
         'username': p.username,
-            'display_name': p.display_name or p.username,
-            'level': p.level,
-            'games_played': p.games_played,
-            'games_won': p.games_won,
-            'win_rate': p.win_rate,
+        'display_name': p.display_name or p.username,
+        'level': p.level,
+        'games_played': p.games_played,
+        'games_won': p.games_won,
+        'win_rate': p.win_rate,
         'total_points': p.total_points,
     } for i, p in enumerate(top_players)]), 200
 
@@ -495,7 +499,6 @@ def get_friends():
             'id': friend.id,
             'username': friend.username,
             'display_name': friend.display_name or friend.username,
-            
             'avatar_url': friend.avatar_url,
             'level': friend.level,
             'online': is_online,
@@ -506,7 +509,7 @@ def get_friends():
 @app.route('/api/friends/add', methods=['POST'])
 @login_required
 def add_friend():
-    """ Creates pending friend request instead of auto-accepting"""
+    """Creates pending friend request instead of auto-accepting"""
     try:
         data = request.get_json(force=True)
         friend_username = data.get('username')
@@ -522,7 +525,6 @@ def add_friend():
             or_(
                 and_(Friendship.user_id == request.current_user.id,
                      Friendship.friend_id == friend.id),
-                
                 and_(Friendship.user_id == friend.id,
                      Friendship.friend_id == request.current_user.id),
             )
@@ -568,17 +570,14 @@ def get_friend_requests():
                     'request_id': req.id,
                     'from_user_id': sender.id,
                     'from_username': sender.username,
-                    
                     'from_display_name': sender.display_name or sender.username,
                     'from_avatar_url': sender.avatar_url,
                     'from_level': sender.level,
                     'sent_at': req.created_at.isoformat() if req.created_at else None
-                }
-                                    )
+                })
         
         return jsonify(requests_list), 200
     except Exception as e:
-        
         logger.error(f"Get friend requests error: {e}")
         return jsonify({'error': 'Failed to get friend requests'}), 500
 
@@ -586,23 +585,23 @@ def get_friend_requests():
 @app.route('/api/friends/accept', methods=['POST'])
 @login_required
 def accept_friend_request():
-    """ Accept a friend request"""
+    """Accept a friend request"""
     try:
         data = request.get_json(force=True)
         request_id = data.get('request_id')
         
         if not request_id:
-        return jsonify({'error': 'Request ID required'}), 400
+            return jsonify({'error': 'Request ID required'}), 400
         
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
         
         if friendship.friend_id != request.current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+            return jsonify({'error': 'Unauthorized'}), 403
         
         if friendship.status != 'pending':
-        return jsonify({'error': 'Request already processed'}), 400
+            return jsonify({'error': 'Request already processed'}), 400
         
         friendship.status = 'accepted'
         db.session.commit()
@@ -623,7 +622,7 @@ def accept_friend_request():
 @app.route('/api/friends/reject', methods=['POST'])
 @login_required
 def reject_friend_request():
-    """Put this in, ISSUE FACED; as it was an auto accept process where when i sent an invite i was automaticaly ur friend but the issue was the other person didnt know until he refreshed or logged out and logged back in:  Reject a friend request"""
+    """ Changed from auto-accept of request to pending approval mentioned above; after realizing player who gets added doesn't know he was added by someone until he refreshed: Reject a friend request"""
     try:
         data = request.get_json(force=True)
         request_id = data.get('request_id')
@@ -648,7 +647,6 @@ def reject_friend_request():
         
         return jsonify({'success': True, 'message': 'Friend request rejected'}), 200
     except Exception as e:
-        
         logger.error(f"Reject friend error: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to reject friend request'}), 500
@@ -657,7 +655,6 @@ def reject_friend_request():
 @app.route('/api/reconnect', methods=['POST'])
 @login_required
 def reconnect():
-    
     """Reconnect with complete state restoration"""
     try:
         data = request.get_json(force=True)
@@ -713,7 +710,6 @@ def reconnect():
             'seat': seat,
             'room_state': room.get_state(),
             'players': room.get_players_info(),
-            
             'game_state': game_session.game_state,
             'round_number': game_session.round_number,
             'trick_count': game_session.trick_count,
@@ -723,7 +719,6 @@ def reconnect():
             try:
                 game_state_response['hand'] = json.loads(game_session.player_hand) if game_session.player_hand else []
                 game_state_response['current_trick'] = json.loads(game_session.current_trick) if game_session.current_trick else []
-                
                 game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
                 game_state_response['current_player'] = game_session.current_player
@@ -772,7 +767,7 @@ def leave_room():
             if room.game_state == GameState.IN_PROGRESS:
                 pause_game_for_reconnect(room_id, seat, player_name)
             else:
-                #  Had an issue where it said 4/4 even when someone left: Properly clear the seat
+                # Properly clear the seat  (We found this when testing; that Players who left couldn't join back because the room was not updating, basically showing 4/4 even though it was 3/4)
                 room.players[seat] = None
         
         game_session = GameSession.query.filter_by(
@@ -787,7 +782,7 @@ def leave_room():
         with sessions_lock:
             del player_sessions[session_id]
         
-        # Broadcast with updated player list
+        # Broadcast with updated player list 
         broadcast_event(room_id, 'player_left', {
             'player_name': player_name,
             'seat': seat,
@@ -830,7 +825,7 @@ def join_room():
         
         room = get_or_create_room(room_id)
         
-        # finally fixd:  Check if user already in room
+        # Check if user already in room (Yann was able to join the same room twice with the same account and browser, and this is an issue we needed to fix asap)
         with rooms_lock:
             for seat, player in room.players.items():
                 if player and player.user_id == request.current_user.id:
@@ -876,7 +871,6 @@ def join_room():
         return jsonify({
             'session_id': session_id,
             'seat': seat,
-            
             'room_state': room.get_state(),
             'players': room.get_players_info()
         }), 200
@@ -912,7 +906,6 @@ def player_ready():
         broadcast_event(room_id, 'player_ready', {
             'seat': seat,
             'player_name': player.name,
-            
             'ready': True,
             'players': room.get_players_info()
         })
@@ -980,7 +973,6 @@ def poll_events():
         if not room_id:
             session_id = request.args.get('session_id')
             with sessions_lock:
-                
                 if session_id and session_id in player_sessions:
                     room_id = player_sessions[session_id]['room_id']
         
@@ -1013,7 +1005,6 @@ def poll_events():
 @app.route('/api/play_card', methods=['POST'])
 @login_required
 def play_card_enhanced():
-    
     """Check if game is paused before allowing play"""
     try:
         data = request.get_json(force=True)
@@ -1025,7 +1016,6 @@ def play_card_enhanced():
                 return jsonify({'error': 'Invalid session'}), 401
             
             session_data = player_sessions[session_id]
-            
             room_id = session_data['room_id']
             seat = session_data['seat']
         
@@ -1158,11 +1148,9 @@ def handle_round_end(room: Room, room_id: str) -> None:
     if final_scores['team_a'] > final_scores['team_b']:
         round_winner = 'Team A'
         winning_score = final_scores['team_a']
-        
     elif final_scores['team_b'] > final_scores['team_a']:
         round_winner = 'Team B'
         winning_score = final_scores['team_b']
-        
     else:
         round_winner = 'Tie'
         winning_score = final_scores['team_a']
@@ -1191,7 +1179,7 @@ def handle_round_end(room: Room, room_id: str) -> None:
 
 
 def update_player_stats(room: Room, game_winner: str) -> None:
-    """Update player statistics in database after game compltes"""
+    """Update player statistics in database after game completes"""
     try:
         winning_team_seats = [0, 2] if game_winner == 'Team A' else [1, 3]
         
@@ -1241,7 +1229,6 @@ def start_new_round(room: Room, room_id: str) -> None:
 @app.errorhandler(404)
 def _json_404(e):
     if request.path.startswith('/api/'):
-        
         return jsonify({'error': 'Not found', 'path': request.path}), 404
     return e
 
@@ -1249,14 +1236,12 @@ def _json_404(e):
 @app.errorhandler(405)
 def _json_405(e):
     if request.path.startswith('/api/'):
-        
         return jsonify({'error': 'Method not allowed', 'path': request.path}), 405
     return e
 
 
 @app.errorhandler(Exception)
 def _json_500(e):
-    
     if request.path.startswith('/api/'):
         code = 500
         if isinstance(e, HTTPException):
@@ -1268,7 +1253,6 @@ def _json_500(e):
 # Initialize database on startup
 with app.app_context():
     db.create_all()
-    
     logger.info("Database initialized")
 
 if __name__ == '__main__':

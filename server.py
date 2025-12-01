@@ -34,8 +34,9 @@ CORS(app, supports_credentials=True, origins=['*'])
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///baloot.db')
+
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
     
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -50,8 +51,8 @@ db = SQLAlchemy(app)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s %(message)s'
+level=logging.INFO,
+format='%(asctime)s %(levelname)s %(name)s %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -95,11 +96,11 @@ class User(db.Model):
     display_name = db.Column(db.String(100))
     
     avatar_url = db.Column(db.String(200))
-        bio = db.Column(db.Text)
-            games_played = db.Column(db.Integer, default=0)
-                games_won = db.Column(db.Integer, default=0)
-            total_points = db.Column(db.Integer, default=0)
-        win_rate = db.Column(db.Float, default=0.0)
+    bio = db.Column(db.Text)
+    games_played = db.Column(db.Integer, default=0)
+    games_won = db.Column(db.Integer, default=0)
+    total_points = db.Column(db.Integer, default=0)
+    win_rate = db.Column(db.Float, default=0.0)
     level = db.Column(db.Integer, default=1)
     
     experience = db.Column(db.Integer, default=0)
@@ -155,12 +156,12 @@ class GameSession(db.Model):
     """Persistent game session with full game state"""
     
     id = db.Column(db.Integer, primary_key=True)
-        session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
-            user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-            room_id = db.Column(db.String(100))
-            seat = db.Column(db.Integer)
-            created_at = db.Column(db.DateTime, default=datetime.utcnow)
-        last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    room_id = db.Column(db.String(100))
+    seat = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
     
     game_state = db.Column(db.Text)

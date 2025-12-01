@@ -3,12 +3,7 @@ Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
 ENGR4450 - Distributed Systems Project
 
-FINAL VERSION - ALL FIXES APPLIED:
-- Friend requests require acceptance (pending status)
-- Players can rejoin after leaving (seat properly cleared)
-- Duplicate join prevention (same account can't join twice)
-- Leave notifications for all players
-- Cards properly removed from hand after playing
+
 """
 import uuid
 import time

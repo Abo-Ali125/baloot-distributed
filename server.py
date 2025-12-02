@@ -249,7 +249,6 @@ def save_game_state_to_db(room: Room, room_id: str):
                 
                 game_session.round_number = room.round_count
                 game_session.last_activity = datetime.utcnow()
-
         
         db.session.commit()
         logger.info(f"Saved game state for room {room_id}")
@@ -267,7 +266,6 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
         'player_name': player_name,
         'paused_at': time.time()
     }
-
     
     broadcast_event(room_id, 'game_paused', {
         'reason': f'{player_name} disconnected',
@@ -607,12 +605,9 @@ def accept_friend_request():
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
-
         
         if friendship.friend_id != request.current_user.id:
             return jsonify({'error': 'Unauthorized'}), 403
-
-
         
         if friendship.status != 'pending':
             return jsonify({'error': 'Request already processed'}), 400
@@ -627,7 +622,6 @@ def accept_friend_request():
             'success': True,
             'message': f'You are now friends with {sender.display_name or sender.username}'
         }), 200
-        
     except Exception as e:
         logger.error(f"Accept friend error: {e}")
         db.session.rollback()
@@ -648,13 +642,12 @@ def reject_friend_request():
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
-
         
         if friendship.friend_id != request.current_user.id:
             return jsonify({'error': 'Unauthorized'}), 403
         
         if friendship.status != 'pending':
-        return jsonify({'error': 'Request already processed'}), 400
+            return jsonify({'error': 'Request already processed'}), 400
         
         db.session.delete(friendship)
         db.session.commit()
@@ -682,10 +675,10 @@ def reconnect():
             room_id=room_id,
             is_active=True
         ).first()
-
         
         if not game_session:
             return jsonify({'error': 'No active session found'}), 404
+        
         if room_id not in rooms:
             return jsonify({'error': 'Room no longer exists'}), 404
         
@@ -703,7 +696,6 @@ def reconnect():
             player.user_id = request.current_user.id
             room.players[seat] = player
         else:
-            
             player.is_connected = True
             player.session_id = new_session_id
             player.update_activity()
@@ -1055,14 +1047,14 @@ def play_card_enhanced():
         with rooms_lock:
             room = rooms.get(room_id)
             if not room or not room.game:
-                return jsonify({'error': 'Game not started'}), 400
+            return jsonify({'error': 'Game not started'}), 400
             
             if room.game_state != GameState.IN_PROGRESS:
-                return jsonify({'error': 'Game not in progress'}), 400
+                    return jsonify({'error': 'Game not in progress'}), 400
             
             if room.game.current_player != seat:
-                curr_player = room.players[room.game.current_player]
-                current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
+                    curr_player = room.players[room.game.current_player]
+                    current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
                 return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
             
             success, message = room.game.play_card(seat, card)
@@ -1104,7 +1096,7 @@ def play_card_enhanced():
                 
                 save_game_state_to_db(room, room_id)
                 
-                # Check if adding current round scores would make a team win (stops carter from playing tricks after hitting 152)
+                # Check if adding current round scores would make a team win (stops Team from playing tricks after hitting 152, Added after Yann And carter had to play 8 tricks even though they won)
                 projected_team_a = room.total_scores['team_a'] + room.game.team_scores['team_a']
                 projected_team_b = room.total_scores['team_b'] + room.game.team_scores['team_b']
                 
@@ -1216,25 +1208,28 @@ def handle_round_end(room: Room, room_id: str) -> None:
             game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         
         room.game_state = GameState.FINISHED  # Mark game as finished before announcing
-
         
         broadcast_event(room_id, 'game_complete', {
             'game_winner': game_winner,
             'final_total_scores': room.total_scores.copy()  # Send final scores before reset
         })
         update_player_stats(room, game_winner)
+       
         # Reset everything for a new game
         reset_game_after_win(room, room_id)
     else:
         start_new_round(room, room_id)
 
+
 def update_player_stats(room: Room, game_winner: str) -> None:
     """Update player statistics in database after game completes"""
     try:
         winning_team_seats = [0, 2] if game_winner == 'Team A' else [1, 3]
+        
         for seat, player in room.players.items():
             if player and player.user_id:
                 user = User.query.get(player.user_id)
+
                 
                 if user:
                     user.games_played += 1
@@ -1244,6 +1239,7 @@ def update_player_stats(room: Room, game_winner: str) -> None:
                         user.games_won += 1
                     
                     user.win_rate = (user.games_won / user.games_played * 100) if user.games_played > 0 else 0
+                    
                     xp_gained = 100 if seat in winning_team_seats else 50
                     user.experience += xp_gained
                     
@@ -1272,7 +1268,6 @@ def start_new_round(room: Room, room_id: str) -> None:
     
     broadcast_event(room_id, 'new_round_ready', {
         'round_number': room.round_count + 1,
-        
         'total_scores': room.total_scores,  # Send current totals
         'message': f'Round {room.round_count} complete! Ready up for Round {room.round_count + 1}!'
     })
@@ -1284,9 +1279,11 @@ def reset_game_after_win(room: Room, room_id: str) -> None:
     room.round_count = 0
     room.game_state = GameState.WAITING
     room.game = None
+    
     for p in room.players.values():
         if p:
             p.is_ready = False
+    
     broadcast_event(room_id, 'game_reset', {
         'message': 'Game complete! Ready up to start a new game.',
         'total_scores': room.total_scores
@@ -1296,10 +1293,8 @@ def reset_game_after_win(room: Room, room_id: str) -> None:
 @app.errorhandler(404)
 def _json_404(e):
     if request.path.startswith('/api/'):
-        
         return jsonify({'error': 'Not found', 'path': request.path}), 404
     return e
-
 
 
 @app.errorhandler(405)
@@ -1308,14 +1303,18 @@ def _json_405(e):
         return jsonify({'error': 'Method not allowed', 'path': request.path}), 405
     return e
 
+
 @app.errorhandler(Exception)
 def _json_500(e):
     if request.path.startswith('/api/'):
         code = 500
+        
         if isinstance(e, HTTPException):
             code = e.code or 500
         return jsonify({'error': 'Server error', 'detail': str(e)}), code
     raise e
+
+
 
 # Initialize database on startup
 with app.app_context():

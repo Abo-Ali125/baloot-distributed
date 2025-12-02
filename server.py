@@ -1047,14 +1047,14 @@ def play_card_enhanced():
         with rooms_lock:
             room = rooms.get(room_id)
             if not room or not room.game:
-            return jsonify({'error': 'Game not started'}), 400
+                return jsonify({'error': 'Game not started'}), 400
             
             if room.game_state != GameState.IN_PROGRESS:
-                    return jsonify({'error': 'Game not in progress'}), 400
+                return jsonify({'error': 'Game not in progress'}), 400
             
             if room.game.current_player != seat:
-                    curr_player = room.players[room.game.current_player]
-                    current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
+                curr_player = room.players[room.game.current_player]
+                current_player_name = curr_player.name if curr_player else f"Player {room.game.current_player + 1}"
                 return jsonify({'error': f'Not your turn. Waiting for {current_player_name}'}), 400
             
             success, message = room.game.play_card(seat, card)
@@ -1096,7 +1096,7 @@ def play_card_enhanced():
                 
                 save_game_state_to_db(room, room_id)
                 
-                # Check if adding current round scores would make a team win (stops Team from playing tricks after hitting 152, Added after Yann And carter had to play 8 tricks even though they won)
+                # Check if adding current round scores would make a team win (stops carter from playing tricks after hitting 152)
                 projected_team_a = room.total_scores['team_a'] + room.game.team_scores['team_a']
                 projected_team_b = room.total_scores['team_b'] + room.game.team_scores['team_b']
                 
@@ -1214,7 +1214,6 @@ def handle_round_end(room: Room, room_id: str) -> None:
             'final_total_scores': room.total_scores.copy()  # Send final scores before reset
         })
         update_player_stats(room, game_winner)
-       
         # Reset everything for a new game
         reset_game_after_win(room, room_id)
     else:
@@ -1308,12 +1307,10 @@ def _json_405(e):
 def _json_500(e):
     if request.path.startswith('/api/'):
         code = 500
-        
         if isinstance(e, HTTPException):
             code = e.code or 500
         return jsonify({'error': 'Server error', 'detail': str(e)}), code
     raise e
-
 
 
 # Initialize database on startup

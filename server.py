@@ -861,7 +861,8 @@ def join_room():
         broadcast_event(room_id, 'player_joined', {
             'player_name': player.name,
             'seat': seat,
-            'players': room.get_players_info()
+            'players': room.get_players_info(),
+            'room_full': room.is_full()  # Tell clients if room is now full
         })
         
         # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button if he disconnects before starting the game, after Yann left by mistake when we were about to test)
@@ -1077,15 +1078,23 @@ def play_card_enhanced():
                 
                 save_game_state_to_db(room, room_id)
                 
-                cards_remaining = sum(len(hand) for hand in room.game.hands.values())
-                if cards_remaining == 0:
+                # Check if adding current round scores would make a team win (stops carter from playing tricks after hitting 152)
+                projected_team_a = room.total_scores['team_a'] + room.game.team_scores['team_a']
+                projected_team_b = room.total_scores['team_b'] + room.game.team_scores['team_b']
+                
+                if projected_team_a >= 152 or projected_team_b >= 152:
+                    # Someone would win if we ended round now - end game immediately
                     handle_round_end(room, room_id)
                 else:
-                    broadcast_event(room_id, 'next_trick_ready', {
-                        'leader': winner_seat,
-                        'leader_name': winner_name,
-                        'trick_number': room.game.trick_count + 1,
-                    })
+                    cards_remaining = sum(len(hand) for hand in room.game.hands.values())
+                    if cards_remaining == 0:
+                        handle_round_end(room, room_id)
+                    else:
+                        broadcast_event(room_id, 'next_trick_ready', {
+                            'leader': winner_seat,
+                            'leader_name': winner_name,
+                            'trick_number': room.game.trick_count + 1,
+                        })
             except Exception as e:
                 logger.error(f"Error resolving trick: {e}")
                 return jsonify({'error': 'Failed to resolve trick'}), 500
@@ -1171,7 +1180,15 @@ def handle_round_end(room: Room, room_id: str) -> None:
     })
     
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
-        game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
+        # Determine winner by HIGHEST score, not who reached 152 first (found when Carter got 239 and Team A 129)
+        if room.total_scores['team_a'] > room.total_scores['team_b']:
+            game_winner = 'Team A'
+        elif room.total_scores['team_b'] > room.total_scores['team_a']:
+            game_winner = 'Team B'
+        else:
+            # Tie at 152+ - whoever reached exactly 152 wins, or Team A if both over
+            game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
+        
         room.game_state = GameState.FINISHED  # Mark game as finished before announcing
         
         broadcast_event(room_id, 'game_complete', {

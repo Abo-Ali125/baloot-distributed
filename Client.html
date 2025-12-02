@@ -13,11 +13,12 @@
     .auth-container { min-height: 100vh; display:flex; align-items:center; justify-content:center; padding:20px; background: linear-gradient(135deg,#1e3a8a 0%, #7c3aed 100%); }
     .auth-card { background: rgba(15,23,42,.95); border-radius:20px; padding:40px; width:100%; max-width:450px; backdrop-filter:blur(20px); border:1px solid rgba(148,163,184,.1); box-shadow:0 25px 50px -12px rgba(0,0,0,.5); }
     .auth-header { text-align:center; margin-bottom:30px; }
+    
     .auth-header h1 { font-size:3rem; background:linear-gradient(135deg,#3b82f6,#a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px; }
     .auth-header p { color:#94a3b8; font-size:1.1rem; }
     .auth-form { display:flex; flex-direction:column; gap:20px; }
-    .form-group { display:flex; flex-direction:column; gap:8px; }
     
+    .form-group { display:flex; flex-direction:column; gap:8px; }
     .form-group label { color:#cbd5e1; font-weight:500; font-size:.95rem; }
     .form-group input { padding:12px 16px; border:1px solid rgba(148,163,184,.2); border-radius:10px; background:rgba(30,41,59,.8); color:#e2e8f0; font-size:1rem; transition:all .3s ease; }
     .form-group input:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
@@ -26,6 +27,7 @@
     .btn { padding:12px 24px; border:none; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; transition:all .3s ease; text-transform:uppercase; letter-spacing:.5px; }
     .btn-primary { background:linear-gradient(135deg,#3b82f6,#8b5cf6); color:white; box-shadow:0 4px 15px rgba(59,130,246,.3); }
     .btn-primary:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 8px 25px rgba(59,130,246,.4); }
+    
     .btn-secondary { background:transparent; color:#3b82f6; border:1px solid rgba(59,130,246,.5); }
     .btn-secondary:hover { background:rgba(59,130,246,.1); }
     .btn-danger { background:linear-gradient(135deg,#ef4444,#dc2626); color:white; }
@@ -44,8 +46,8 @@
     .navbar { background: rgba(15,23,42,.95); border-radius:15px; padding:15px 25px; margin-bottom:20px; backdrop-filter: blur(10px); border:1px solid rgba(148,163,184,.1); display:flex; justify-content:space-between; align-items:center; }
     .nav-brand h2{ font-size:1.8rem; background:linear-gradient(135deg,#3b82f6,#8b5cf6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
     .nav-user { display:flex; align-items:center; gap:20px; }
-    .user-info{ display:flex; align-items:center; gap:10px; }
     
+    .user-info{ display:flex; align-items:center; gap:10px; }
     .user-avatar{ width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#3b82f6,#8b5cf6); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; }
     .user-details{ display:flex; flex-direction:column; }
     .user-name{ font-weight:600; color:#e2e8f0; }
@@ -67,11 +69,12 @@
     .friends-list{ max-height:400px; overflow-y:auto; }
     .friend-item{ display:flex; align-items:center; gap:12px; padding:10px; margin-bottom:8px; background:rgba(30,41,59,.6); border-radius:10px; cursor:pointer; transition:all .3s ease; }
     .friend-item:hover{ background:rgba(59,130,246,.1); }
+    
     .friend-avatar{ width:35px; height:35px; border-radius:50%; background:#475569; display:flex; align-items:center; justify-content:center; font-weight:600; }
     .friend-info{ flex:1; }
-    
     .friend-name{ font-weight:500; margin-bottom:2px; }
     .friend-status{ font-size:.85rem; color:#94a3b8; }
+    
     .online-indicator{ width:8px; height:8px; border-radius:50%; background:#10b981; }
     .offline-indicator{ width:8px; height:8px; border-radius:50%; background:#6b7280; }
     
@@ -79,8 +82,10 @@
     .badge { display:inline-block; background:#ef4444; color:white; border-radius:10px; padding:2px 8px; font-size:0.8rem; margin-left:5px; font-weight:bold; }
     .friend-request-item { display:flex; align-items:center; gap:10px; padding:12px; margin-bottom:10px; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.3); border-radius:10px; transition:all .3s ease; }
     .friend-request-item:hover { background:rgba(59,130,246,.15); border-color:rgba(59,130,246,.5); }
+    
     .btn-accept, .btn-reject { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer; font-size:1.1rem; font-weight:bold; transition:all .3s ease; display:flex; align-items:center; justify-content:center; }
     .btn-accept { background:#10b981; color:white; }
+    
     .btn-accept:hover { background:#059669; transform:scale(1.1); box-shadow:0 4px 12px rgba(16,185,129,.4); }
     .btn-reject { background:#ef4444; color:white; }
     .btn-reject:hover { background:#dc2626; transform:scale(1.1); box-shadow:0 4px 12px rgba(239,68,68,.4); }
@@ -94,6 +99,7 @@
     /* player positions around table */
     .player-slot.top{ top:0; left:50%; transform:translateX(-50%); }
     .player-slot.right{ right:0; top:50%; transform:translateY(-50%); }
+    
     .player-slot.bottom{ bottom:0; left:50%; transform:translateX(-50%); }
     .player-slot.left{ left:0; top:50%; transform:translateY(-50%); }
     
@@ -113,6 +119,7 @@
     /* scoreboard */
     .score-board{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px; }
     .team-score{ text-align:center; padding:20px; background:rgba(30,41,59,.8); border-radius:12px; border:1px solid rgba(148,163,184,.3); }
+    
     .team-score.winning{ background:rgba(16,185,129,.2); border-color:rgba(16,185,129,.5); box-shadow:0 0 20px rgba(16,185,129,.2); }
     .team-name{ font-size:1.1rem; font-weight:600; margin-bottom:10px; color:#94a3b8; }
     .team-points{ font-size:2.5rem; font-weight:bold; color:#3b82f6; }
@@ -122,6 +129,7 @@
     .chat-messages{ flex:1; overflow-y:auto; padding:10px; background:rgba(7,16,34,.5); border-radius:10px; margin-bottom:10px; }
     .chat-message{ margin-bottom:10px; padding:8px; background:rgba(30,41,59,.6); border-radius:8px; }
     .chat-author{ font-weight:600; color:#3b82f6; margin-bottom:3px; }
+    
     .chat-text{ color:#e2e8f0; font-size:.95rem; }
     .chat-input-group{ display:flex; gap:10px; }
     .chat-input{ flex:1; padding:10px; border:1px solid rgba(148,163,184,.3); border-radius:8px; background:rgba(30,41,59,.8); color:#e2e8f0; }
@@ -191,15 +199,15 @@
     </div>
   </div>
 
-  <!-- ========================================= -->
+  <!-- ============================================ -->
   <!-- MAIN GAME APP - shows after login -->
-  <!-- ======================================== -->
+  <!-- ============================================ -->
   <div id="gameApp" class="game-app">
     <div class="container">
       
-      <!-- ================================ -->
+      <!-- ============================================ -->
       <!-- TOP NAVIGATION BAR -->
-      <!-- ======================================= -->
+      <!-- ============================================ -->
       <nav class="navbar">
         <!-- Left side - game title -->
         <div class="nav-brand"><h2>🎯 Baloot</h2></div>
@@ -220,14 +228,14 @@
         </div>
       </nav>
 
-      <!-- ======================================== -->
+      <!-- ============================================ -->
       <!-- 3-COLUMN LAYOUT: LEFT | CENTER | RIGHT -->
       <!-- ============================================ -->
       <div class="main-content">
         
         <!-- ============================================ -->
         <!-- LEFT SIDEBAR: Rooms & Friends -->
-        <!-- ==================================== -->
+        <!-- ============================================ -->
         <aside class="sidebar">
           
           <!-- Active Rooms Panel -->
@@ -238,10 +246,8 @@
               <input type="text" id="roomNameInput" placeholder="Room name..." />
               <button class="btn btn-primary" id="createRoomBtn" style="width:100%; margin-top:10px;">Create Room</button>
             </div>
-            <!-- List of available rooms -->
             <div class="room-browser" id="roomBrowser"></div>
           </div>
-          <!-- Friends List Panel -->
           <div class="panel" style="margin-top:20px;">
             <h3>👥 Friends</h3>
             <!-- Add friend input -->
@@ -263,9 +269,9 @@
           </div>
         </aside>
 
-        <!-- ================================ -->
+        <!-- ============================================ -->
         <!-- CENTER: Game Table & Player Hand -->
-        <!-- ============================ -->
+        <!-- ============================================ -->
         <main>
           
           <!-- Game Table Panel -->
@@ -274,29 +280,35 @@
             <div class="game-table">
               <!-- Player positions container - 4 seats around table -->
               <div class="player-positions">
-        
+                <!-- Top player (seat 0) -->
                 <div class="player-slot top" id="player0">
                   <div class="player-name">Waiting...</div>
                 </div>
-     
+                
+                <!-- Right player (seat 1) -->
                 <div class="player-slot right" id="player1">
                   <div class="player-name">Waiting...</div>
                 </div>
                 
+                <!-- Bottom player (seat 2) -->
                 <div class="player-slot bottom" id="player2">
                   <div class="player-name">Waiting...</div>
                 </div>
+                
+                <!-- Left player (seat 3) -->
                 
                 <div class="player-slot left" id="player3">
                   <div class="player-name">Waiting...</div>
                 </div>
                 
                 <!-- Center area where players throw their cards -->
+                
                 <div class="trick-area" id="trickArea">
                   <!-- 4 slots for cards in current trick -->
                   <div class="trick-card-slot" id="trickCard0"></div>
                   <div class="trick-card-slot" id="trickCard1"></div>
                   <div class="trick-card-slot" id="trickCard2"></div>
+                  
                   <div class="trick-card-slot" id="trickCard3"></div>
                 </div>
               </div>
@@ -304,14 +316,15 @@
           </div>
 
           <!-- Scoreboard - shows team points -->
+
+          
           <div class="score-board">
-            <!-- Team A (seats 0 & 2) -->
             <div class="team-score" id="teamAScore">
               <div class="team-name">Team A (Seats 1 & 3)</div>
               <div class="team-points">0</div>
             </div>
+
             
-            <!-- Team B (seats 1 & 3) -->
             <div class="team-score" id="teamBScore">
               <div class="team-name">Team B (Seats 2 & 4)</div>
               <div class="team-points">0</div>
@@ -327,7 +340,7 @@
         </main>
 
         <!-- ============================================ -->
-        <!-- RIGHT SIDE: Game Info, Chat, Leaderboard -->
+        <!-- RIGHT SIDEBAR: Game Info, Chat, Leaderboard -->
         <!-- ============================================ -->
         <aside class="sidebar">
           
@@ -337,7 +350,7 @@
             <div style="padding:10px;">
               <!-- Room name -->
               <p><strong>Room:</strong> <span id="currentRoom">-</span></p>
-              <p><strong>Your Seat:</strong> <span id="yourSeat">-</span></p> 
+              <p><strong>Your Seat:</strong> <span id="yourSeat">-</span></p>
               <p><strong>Your Team:</strong> <span id="yourTeam">-</span></p>
               <p><strong>Current Turn:</strong> <span id="currentTurn">-</span></p>
               <p><strong>Trick #:</strong> <span id="trickNumber">-</span></p>
@@ -354,7 +367,6 @@
             <h3>💬 Chat</h3>
             <div class="chat-box">
               <div class="chat-messages" id="chatMessages"></div>
-            
               <div class="chat-input-group">
                 <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..." />
                 <button class="btn btn-secondary" id="sendChatBtn">Send</button>
@@ -369,12 +381,12 @@
           </div>
         </aside>
         
-      </div>
+      </div><!-- end main-content -->
     </div><!-- end container -->
   </div><!-- end gameApp -->
 
   <script>
-    // ====================
+    // ============================================
     // CONFIG - change these if needed
     // ============================================
     const HEARTBEAT_INTERVAL = 30000; // keep session alive every 30 seconds
@@ -391,6 +403,7 @@
         const ct = res.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
           const text = await res.text();
+          
           console.error('Got non-JSON response:', text.slice(0, 200));
           throw new Error(`Expected JSON, got: ${text.slice(0,120)}`);
         }
@@ -400,12 +413,15 @@
       },
     };
 
+
+    
     // show popup notifications to user
     function showNotification(message, type = 'info') {
       const n = document.createElement('div');
       n.className = `notification ${type}`;
       n.textContent = message;
       document.body.appendChild(n);
+      
       setTimeout(() => {
         n.style.animation = 'slideIn .3s ease reverse';
         setTimeout(() => n.remove(), 300);
@@ -468,13 +484,11 @@
           headers: { 'Authorization': authToken },
           body: JSON.stringify({ session_id: oldSessionId, room_id: roomId })
         });
-        
         // update our state
         sessionId = data.session_id;
         currentRoomId = data.room_state.room_id;
         playerSeat = data.seat;
         lastTimestamp = 0;
-        
         // update UI with room info
         document.getElementById('currentRoom').textContent = currentRoomId;
         document.getElementById('yourSeat').textContent = playerSeat + 1;
@@ -516,7 +530,6 @@
             document.getElementById('currentTurn').textContent = 
               currPlayer ? currPlayer.name : `Player ${data.current_player + 1}`;
           }
-          
           readyBtn.disabled = true;
         } else {
           // Enable ready button if we can ready up
@@ -537,21 +550,24 @@
       }
     }
 
-    // ============================================
+    // ================================
     // HEARTBEAT - keeps session alive
-    // ============================================
+    // ======================================
     let heartbeatInterval = null;
 
     function startHeartbeat() {
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
       }
+
       
       heartbeatInterval = setInterval(async () => {
         if (!sessionId || !authToken) {
+          
           stopHeartbeat();
           return;
         }
+
         
         try {
           await api.json('/api/heartbeat', {
@@ -564,9 +580,7 @@
         }
       }, HEARTBEAT_INTERVAL);
       
-      console.log('Started heartbeat');
-    }
-
+      console.log('Started heartbeat');}
     function stopHeartbeat() {
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
@@ -582,6 +596,7 @@
     let currentUser = null; // user info
     let sessionId = null; // game session ID
     let currentRoomId = null; // room we're in
+    
     let playerSeat = null; // our seat number (0-3)
     let lastTimestamp = 0; // for polling events
     let polling = false; // polling active flag
@@ -601,7 +616,7 @@
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const sendChatBtn = document.getElementById('sendChatBtn');
 
-    // ============================================
+    // =========================================
     // AUTH FORM SWITCHING
     // ============================================
     switchToRegister.onclick = () => {
@@ -614,9 +629,9 @@
       loginForm.style.display = 'block';
     };
 
-    // ===========================
+    // ====================
     // LOGIN HANDLER
-    // =================================
+    // =================================================
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('loginUsername').value.trim();
@@ -626,16 +641,15 @@
         showNotification('Fill in all fields', 'warning');
         return;
       }
+      
       try {
         const data = await api.json('/api/login', { 
           method:'POST', 
           body: JSON.stringify({ username, password }) 
         });
-        
         authToken = data.auth_token; 
         currentUser = data.user; 
         localStorage.setItem('authToken', authToken);
-        
         await showGameApp();
       } catch (err) {
         console.error('Login error:', err);
@@ -643,9 +657,9 @@
       }
     });
 
-    // =======================
+    // =============================
     // REGISTRATION HANDLER
-    // =================================
+    // ============================
     registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('regUsername').value.trim();
@@ -662,6 +676,7 @@
         showNotification('Password must be 6+ chars', 'warning');
         return;
       }
+      
       try {
         const data = await api.json('/api/register', { 
           method:'POST', 
@@ -677,9 +692,9 @@
       }
     });
 
-    // ========================
+    // ============================================
     // LOGOUT HANDLER
-    // ==================================
+    // ==============================
     logoutBtn.onclick = async () => {
       try {
         await fetch('/api/logout', { 
@@ -687,7 +702,9 @@
           headers:{ 'Authorization': authToken } 
         });
       } catch(e) {
-        console.log('Logout request failed but whatever');}
+        console.log('Logout request failed but whatever');
+      }
+      
       localStorage.removeItem('authToken'); 
       localStorage.removeItem('gameSession');
       authToken = null;
@@ -696,9 +713,9 @@
       location.reload();
     };
 
-    // ====================
+    // ============================================
     // CREATE/JOIN ROOM HANDLER
-    // ============================
+    // ===================================
     createRoomBtn.onclick = async () => {
       const roomName = document.getElementById('roomNameInput').value.trim() || `Room-${Date.now()}`;
       await joinRoom(roomName);
@@ -706,7 +723,7 @@
 
     // ================================
     // ADD FRIEND HANDLER
-    // ======================================
+    // =============================
     addFriendBtn.onclick = async () => {
       const username = document.getElementById('friendUsername').value.trim();
       if (!username) {
@@ -720,25 +737,26 @@
           headers:{ 'Authorization': authToken }, 
           body: JSON.stringify({ username }) 
         });
-        
         showNotification('Friend request sent', 'success');
         document.getElementById('friendUsername').value = '';
-        loadFriends();
         
+        loadFriends();
       } catch (err) {
         console.error('Add friend error:', err);
         showNotification(err.message || 'Failed to add friend','error');
       }
     };
 
+    
     // ============================================
     // READY BUTTON HANDLER
-    // ================================
+    // ===============================
     readyBtn.onclick = async () => {
       if (!sessionId) {
         showNotification('Join a room first', 'warning');
         return;
       }
+
       
       try { 
         await api.json('/api/ready', {
@@ -746,7 +764,6 @@
           body: JSON.stringify({ session_id: sessionId }),
           headers:{ 'Authorization': authToken }
         }); 
-        
         readyBtn.disabled = true; 
         showNotification('Ready!','success'); 
       } catch (e){
@@ -755,14 +772,15 @@
       }
     };
 
-    // ============================================
+    // ================================
     // LEAVE ROOM HANDLER
-    // ==================================
+    // ===============================
     leaveRoomBtn.onclick = async () => {
       if (!sessionId) return;
       if (!confirm('Leave room?')) return;
       
       stopHeartbeat();
+      
       try {
         await api.json('/api/leave', {
           method:'POST',
@@ -773,6 +791,7 @@
         sessionId = null;
         currentRoomId = null;
         playerSeat = null;
+        
         polling = false;
         localStorage.removeItem('gameSession');
         // reset UI
@@ -792,9 +811,9 @@
       }
     };
 
-    // ======================
+    // ============================================
     // CHAT HANDLERS
-    // ===============================
+    // ============================
     sendChatBtn.onclick = sendChat;
     document.getElementById('chatInput').addEventListener('keypress', e => {
       if (e.key === 'Enter') sendChat();
@@ -802,6 +821,7 @@
 
     async function sendChat(){
       const input = document.getElementById('chatInput');
+      
       const msg = input.value.trim(); 
       if (!msg || !sessionId) return;
       
@@ -833,27 +853,29 @@
       }
     }
 
-    // ============================================
+    // =========================
     // LOAD USER PROFILE
-    // ============================================
+    // ================================
     async function loadProfile() {
       try {
         const res = await fetch('/api/profile', { 
           headers:{ 'Authorization': authToken } 
         });
+        
         if (res.ok) {
           currentUser = await res.json();
           return true;
         }
+        
       } catch(e) {
         console.error('Failed to load profile:', e);
       }
       return false;
     }
 
-    // ============================================
+    // =================================
     // LOAD AVAILABLE ROOMS
-    // ============================================
+    // =================================
     async function loadRooms() {
       try {
         const rooms = await api.json('/api/rooms');
@@ -864,13 +886,13 @@
           rb.innerHTML = '<div style="padding:10px; color:#9ca3af; text-align:center;">No rooms</div>';
           return;
         }
+        
         // create room item for each room
         rooms.forEach(r => {
           const el = document.createElement('div');
           el.className = 'room-item';
           el.innerHTML = `
             <div class="room-name">${r.room_id}</div>
-            
             <div class="room-info">
               <span>${r.player_count}/4 players</span>
               <span>${r.game_state}</span>
@@ -883,9 +905,9 @@
       }
     }
 
-    // ======================
+    // ============================
     // LOAD FRIENDS LIST
-    // =============================
+    // ==================================
     async function loadFriends() {
       try {
         const friends = await api.json('/api/friends', { 
@@ -893,15 +915,19 @@
         });
         const list = document.getElementById('friendsList');
         list.innerHTML = '';
+        
         if (friends.length === 0) {
           list.innerHTML = '<div style="padding:10px; color:#9ca3af; text-align:center;">No friends yet</div>';
           return;
         }
+        
         // create friend item for each friend
         friends.forEach(f => {
+          
           const el = document.createElement('div');
           el.className = 'friend-item';
           el.innerHTML = `
+          
             <div class="friend-avatar">${(f.display_name || f.username)[0].toUpperCase()}</div>
             <div class="friend-info">
               <div class="friend-name">${f.display_name || f.username}</div>
@@ -914,35 +940,42 @@
         console.error('Failed to load friends:', e);
       }
     }
-    // =====================================
+
+    // ==========================
     // LOAD FRIEND REQUESTS - new feature
-    // ============================================
+    // =================================
     async function loadFriendRequests() {
       try {
         const requests = await api.json('/api/friends/requests', { 
           headers:{ 'Authorization': authToken } 
         });
+        
         const container = document.getElementById('friendRequests');
         const badge = document.getElementById('requestBadge');
-        
         // update badge count
         badge.textContent = requests.length;
         badge.style.display = requests.length > 0 ? 'inline-block' : 'none';
+
+
         
         if (requests.length === 0) {
           container.innerHTML = '<div style="padding:10px; color:#9ca3af; text-align:center;">No pending requests</div>';
-          return; }
+          return;
+        }
+        
         // show each request with accept/reject buttons
         container.innerHTML = '';
         requests.forEach(req => {
           const el = document.createElement('div');
           el.className = 'friend-request-item';
           el.innerHTML = `
+          
             <div class="friend-avatar">${req.from_display_name[0].toUpperCase()}</div>
             <div class="friend-info" style="flex:1;">
               <div class="friend-name">${req.from_display_name}</div>
               <div class="friend-status">Level ${req.from_level}</div>
             </div>
+            
             <button class="btn-accept" onclick="acceptFriend(${req.request_id})" title="Accept">✓</button>
             <button class="btn-reject" onclick="rejectFriend(${req.request_id})" title="Reject">✗</button>
           `;
@@ -953,9 +986,9 @@
       }
     }
 
-    // =========================================
+    // ============================================
     // ACCEPT FRIEND REQUEST
-    // =======================================
+    // ======================================
     async function acceptFriend(requestId) {
       try {
         const data = await api.json('/api/friends/accept', {
@@ -972,7 +1005,7 @@
       }
     }
 
-    // ============================================
+    // =============================
     // REJECT FRIEND REQUEST
     // ======================================
     async function rejectFriend(requestId) {
@@ -990,9 +1023,9 @@
       }
     }
 
-    // ============================================
+    // =====================================
     // LOAD LEADERBOARD
-    // ============================================
+    // ===================================
     async function loadLeaderboard() {
       try {
         const players = await api.json('/api/leaderboard');
@@ -1002,11 +1035,11 @@
           lb.innerHTML = '<div style="padding:10px; color:#9ca3af; text-align:center;">No rankings yet</div>';
           return;
         }
-        
         // show top players with rank and stats
         lb.innerHTML = players.map(p => `
           <div style="padding:8px; border-bottom:1px solid rgba(148,163,184,.1);">
             <strong>#${p.rank}</strong> ${p.display_name || p.username}
+            
             <span style="color:#94a3b8;">Lvl ${p.level || 1} • ${Number(p.win_rate || 0).toFixed(1)}% WR</span>
           </div>`).join('');
       } catch (e) {
@@ -1014,9 +1047,9 @@
       }
     }
 
-    // ============================================
+    // ==============================
     // JOIN A ROOM
-    // ===============================
+    // =====================================
     async function joinRoom(roomId){
       if (!roomId) {
         showNotification('Invalid room', 'error');
@@ -1037,8 +1070,10 @@
           polling = false;
           stopHeartbeat();
         } catch(e) {
-          console.error('Auto-leave failed:', e);}
+          console.error('Auto-leave failed:', e);
+        }
       }
+
       
       try {
         const data = await api.json('/api/join', {
@@ -1046,6 +1081,9 @@
           headers:{ 'Authorization': authToken },
           body: JSON.stringify({ room_id: roomId })
         });
+
+
+        
         // save session info for reconnection
         sessionId = data.session_id; 
         currentRoomId = roomId; 
@@ -1053,6 +1091,7 @@
         lastTimestamp = 0;
         
         saveSessionInfo(sessionId, roomId, playerSeat);
+        
         // update UI
         document.getElementById('currentRoom').textContent = roomId;
         document.getElementById('yourSeat').textContent = playerSeat + 1;
@@ -1062,7 +1101,6 @@
         updatePlayers(data.players);
         startPolling();
         startHeartbeat();
-        
         // Set ready button state based on server response
         if (data.can_ready) {
           readyBtn.disabled = false;
@@ -1076,12 +1114,13 @@
       }
     }
 
-    // =============
+    // =====================
     // UPDATE PLAYER SLOTS
-    // ================================
+    // ===============================
     function updatePlayers(players){
       for (let seat = 0; seat < 4; seat++) {
         const el = document.getElementById(`player${seat}`);
+        
         if (players[seat]) {
           // show player name and ready status
           el.innerHTML = `
@@ -1089,12 +1128,15 @@
             <div style="font-size:.9rem; color:#94a3b8;">
               Team ${players[seat].team} ${players[seat].is_ready ? '✓' : ''}
             </div>`;
+
+          
           // highlight your seat
           if (seat === playerSeat) {
             el.classList.add('active');
           } else {
             el.classList.remove('active');
           }
+          
         } else {
           // empty seat
           el.innerHTML = '<div class="player-name">Waiting...</div>';
@@ -1103,9 +1145,9 @@
       }
     }
 
-    // ============
+    // ============================
     // RENDER PLAYER'S HAND
-    // =============================
+    // ================================
     function renderHand(cards){
       const handEl = document.getElementById('playerHand');
       handEl.innerHTML = '';
@@ -1125,9 +1167,9 @@
       });
     }
 
-    // ===================
+    // ==================================
     // PLAY A CARD
-    // ============================
+    // ==============================
     async function playCard(card){
       if (!sessionId) {
         showNotification('Not in game', 'warning');
@@ -1151,7 +1193,7 @@
 
     // ============================================
     // UPDATE TRICK AREA (center of table)
-    // ========================================
+    // ===============================
     function updateTrickArea(data){
       if (data.current_trick) {
         data.current_trick.forEach(tr => {
@@ -1174,9 +1216,9 @@
       }
     }
 
-    // =================================
+    // ==============================
     // CLEAR TRICK AREA
-    // ==========================
+    // =========================================
     function clearTrickArea(){
       for (let i = 0; i < 4; i++) {
         const slot = document.getElementById(`trickCard${i}`);
@@ -1185,9 +1227,9 @@
       }
     }
 
-    // ============================
+    // ==================================
     // UPDATE TEAM SCORES
-    // ======================================
+    // ================================
     function updateScores(scores){
       const teamA = scores.team_a || 0;
       const teamB = scores.team_b || 0;
@@ -1200,7 +1242,7 @@
       document.getElementById('teamBScore').classList.toggle('winning', teamB > teamA);
     }
 
-    // ============================================
+    // ===================================
     // POLLING SYSTEM - gets events from server
     // ============================================
     let pollRetries = 0;
@@ -1222,6 +1264,7 @@
           const res = await fetch(url, { 
             headers:{ 'Authorization': authToken } 
           });
+          
           const ct = res.headers.get('content-type') || '';
           
           if (!ct.includes('application/json')) {
@@ -1229,7 +1272,6 @@
             await new Promise(r => setTimeout(r, 1000));
             continue;
           }
-          
           const data = await res.json();
           
           // process any new events
@@ -1253,13 +1295,12 @@
           await new Promise(r => setTimeout(r, 2000));
         }
       }
-      
       console.log('Polling stopped');
     }
 
     // ============================================
     // HANDLE GAME EVENTS FROM SERVER
-    // ============================================
+    // ========================================
     const shownNotificationIds = new Set(); // Track shown notifications to prevent replays
     
     function handleGameEvent(event){
@@ -1274,8 +1315,8 @@
         if (shownNotificationIds.size > 100) {
           const firstId = shownNotificationIds.values().next().value;
           shownNotificationIds.delete(firstId);
-        }
-      }
+        }}
+      
       switch(event.type){
         case 'player_joined': 
           updatePlayers(event.data.players); 
@@ -1285,6 +1326,7 @@
             readyBtn.disabled = false;
           }
           break;
+
           
         case 'player_left':
           updatePlayers(event.data.players);
@@ -1294,10 +1336,11 @@
             showNotification(`${event.data.player_name} left`, 'warning');
           }
           break;
+
+          
         case 'player_reconnected':
           addChatMessage('System', `${event.data.player_name} reconnected`);
           break;
-          
         case 'player_ready': 
           addChatMessage('System', `${event.data.player_name} is ready`); 
           if (event.data.players) updatePlayers(event.data.players);
@@ -1306,6 +1349,7 @@
         case 'game_started': 
           if (shouldShowNotif) showNotification('Game started','success'); 
           addChatMessage('System','Game started'); 
+          
           readyBtn.disabled = true; 
           document.getElementById('roundNumber').textContent = event.data.round_number || 1;
           clearTrickArea();
@@ -1324,6 +1368,7 @@
           // only render cards for this player
           if (event.data.seat === playerSeat) {
             console.log('Got cards:', event.data.cards);
+            
             renderHand(event.data.cards);
           }
           break;
@@ -1332,7 +1377,7 @@
           updateTrickArea(event.data); 
           addChatMessage('Game', `${event.data.player_name} played ${formatCard(event.data.card)}`);
           
-          // remove card from hand immediately after playing
+          // IMPORTANT: remove card from hand immediately after playing
           if (event.data.seat === playerSeat) {
             const handEl = document.getElementById('playerHand');
             // get current cards from DOM
@@ -1362,6 +1407,7 @@
           
           setTimeout(clearTrickArea, 1500); // clear after delay
           break;
+          
         case 'round_complete': 
           if (shouldShowNotif) showNotification(`Round ${event.data.round_number} done! ${event.data.round_winner} wins`, 'success'); 
           updateScores(event.data.total_scores); 
@@ -1376,6 +1422,7 @@
           if (shouldShowNotif) showNotification(`Game Over! ${event.data.game_winner} wins!`, 'success'); 
           updateScores(event.data.final_total_scores); 
           addChatMessage('System', `${event.data.game_winner} won the game!`);
+          
           addChatMessage('System', `Final - A: ${event.data.final_total_scores.team_a}, B: ${event.data.final_total_scores.team_b}`);
           document.getElementById('playerHand').innerHTML = '';
           clearTrickArea();
@@ -1388,6 +1435,9 @@
           addChatMessage('System', event.data.message);
           readyBtn.disabled = false;
           break;
+
+          
+          
         case 'next_trick_ready': 
           document.getElementById('trickNumber').textContent = event.data.trick_number; 
           // Update current turn to show who leads this trick
@@ -1399,6 +1449,7 @@
           addChatMessage('System', event.data.message); 
           readyBtn.disabled = false; 
           break;
+          
         case 'chat_message': 
           addChatMessage(event.data.author, event.data.message); 
           break;
@@ -1424,9 +1475,9 @@
       }
     }
 
-    // ============================================
+    // =====================
     // SHOW MAIN GAME APP
-    // ============================
+    // =========================
     async function showGameApp(){
       document.getElementById('authScreen').style.display = 'none';
       document.getElementById('gameApp').classList.add('active');
@@ -1435,26 +1486,29 @@
       document.getElementById('userName').textContent = currentUser.display_name || currentUser.username;
       document.getElementById('userAvatar').textContent = (currentUser.username || 'U')[0].toUpperCase();
       document.getElementById('userLevel').textContent = `Level ${currentUser.level || 1} • ${currentUser.experience || 0} XP`;
+      
       // load initial data
       loadRooms();
       loadFriends();
       loadLeaderboard();
       loadFriendRequests();
-
       
       // poll for new friend requests every 30 seconds
       setInterval(() => {
         if (currentUser && !currentRoomId) {
           loadFriendRequests();
+          loadRooms();  // also refresh rooms list
+          loadFriends(); // and friends status
         }
-      }, 30000);
+      }, 5000);  // every 5 sec so you don't need to refresh
     }
 
-    // ============================================
+    // ================================
     // INITIALIZE APP
-    // =============
+    // ===========================
     async function init(){
       console.log('Starting Baloot...');
+      
       // check if already logged in
       if (authToken) {
         const ok = await loadProfile();
@@ -1467,14 +1521,7 @@
           localStorage.removeItem('authToken');
           authToken = null;
         }
-      }
-      // refresh rooms list periodically
-      setInterval(() => {
-        if (currentUser && !currentRoomId) {
-          loadRooms();
-        }
-      }, 10000);
-    }
+      } }
     // start everything
     init();
   </script>

@@ -249,6 +249,7 @@ def save_game_state_to_db(room: Room, room_id: str):
                 
                 game_session.round_number = room.round_count
                 game_session.last_activity = datetime.utcnow()
+
         
         db.session.commit()
         logger.info(f"Saved game state for room {room_id}")
@@ -266,6 +267,7 @@ def pause_game_for_reconnect(room_id: str, disconnected_seat: int, player_name: 
         'player_name': player_name,
         'paused_at': time.time()
     }
+
     
     broadcast_event(room_id, 'game_paused', {
         'reason': f'{player_name} disconnected',
@@ -605,9 +607,12 @@ def accept_friend_request():
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
+
         
         if friendship.friend_id != request.current_user.id:
             return jsonify({'error': 'Unauthorized'}), 403
+
+
         
         if friendship.status != 'pending':
             return jsonify({'error': 'Request already processed'}), 400
@@ -622,6 +627,7 @@ def accept_friend_request():
             'success': True,
             'message': f'You are now friends with {sender.display_name or sender.username}'
         }), 200
+        
     except Exception as e:
         logger.error(f"Accept friend error: {e}")
         db.session.rollback()
@@ -642,12 +648,13 @@ def reject_friend_request():
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
+
         
         if friendship.friend_id != request.current_user.id:
             return jsonify({'error': 'Unauthorized'}), 403
         
         if friendship.status != 'pending':
-            return jsonify({'error': 'Request already processed'}), 400
+        return jsonify({'error': 'Request already processed'}), 400
         
         db.session.delete(friendship)
         db.session.commit()
@@ -675,10 +682,10 @@ def reconnect():
             room_id=room_id,
             is_active=True
         ).first()
+
         
         if not game_session:
             return jsonify({'error': 'No active session found'}), 404
-        
         if room_id not in rooms:
             return jsonify({'error': 'Room no longer exists'}), 404
         
@@ -696,6 +703,7 @@ def reconnect():
             player.user_id = request.current_user.id
             room.players[seat] = player
         else:
+            
             player.is_connected = True
             player.session_id = new_session_id
             player.update_activity()

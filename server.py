@@ -1,7 +1,7 @@
 """
 Baloot Game Server
 Team Madrid: Yann Lekomo, Hussain Al Mohsin, Carter Bossong
-ENGR4450 - Distributed Systems Project
+ENGR4450 - Distributed Systems Implementation Project
 
 """
 import uuid
@@ -326,7 +326,7 @@ def register():
         password = data.get('password') or ''
         
         if not username or len(username) < 3:
-            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        return jsonify({'error': 'Username must be at least 3 characters'}), 400
             
         if not email or '@' not in email:
             return jsonify({'error': 'Valid email required'}), 400
@@ -371,6 +371,7 @@ def register():
 def login():
     try:
         data = request.get_json(force=True)
+        
         username_or_email = (data.get('username') or '').strip()
         password = data.get('password') or ''
         
@@ -421,6 +422,7 @@ def logout():
 
 @app.route('/api/profile', methods=['GET'])
 @login_required
+
 def get_profile():
     return jsonify(request.current_user.to_dict()), 200
 
@@ -436,9 +438,10 @@ def update_profile():
             
         if 'bio' in data:
             user.bio = (data['bio'] or '')[:500]
-            
+
+        
         if 'avatar_url' in data:
-            user.avatar_url = (data['avatar_url'] or '')[:200]
+                user.avatar_url = (data['avatar_url'] or '')[:200]
         
         db.session.commit()
         return jsonify(user.to_dict()), 200
@@ -448,6 +451,7 @@ def update_profile():
         db.session.rollback()
         return jsonify({'error': 'Update failed'}), 500
 
+
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
     top_players = User.query.order_by(
@@ -455,6 +459,7 @@ def get_leaderboard():
         User.win_rate.desc(),
         User.total_points.desc()
     ).limit(20).all()
+
     
     return jsonify([{
         'rank': i + 1,
@@ -463,6 +468,7 @@ def get_leaderboard():
         'level': p.level,
         'games_played': p.games_played,
         'games_won': p.games_won,
+        
         'win_rate': p.win_rate,
         'total_points': p.total_points,
     } for i, p in enumerate(top_players)]), 200
@@ -474,6 +480,7 @@ def get_friends():
     friendships = Friendship.query.filter(
         and_(
             or_(
+                
                 Friendship.user_id == request.current_user.id,
                 Friendship.friend_id == request.current_user.id
             ),
@@ -492,8 +499,10 @@ def get_friends():
         friends.append({
             'id': friend.id,
             'username': friend.username,
+            
             'display_name': friend.display_name or friend.username,
             'avatar_url': friend.avatar_url,
+            
             'level': friend.level,
             'online': is_online,
         })
@@ -503,7 +512,7 @@ def get_friends():
 @app.route('/api/friends/add', methods=['POST'])
 @login_required
 def add_friend():
-    """Creates pending friend request instead of auto-accepting"""
+    """ Creates pending friend request instead of auto-accepting"""
     try:
         data = request.get_json(force=True)
         friend_username = data.get('username')
@@ -533,7 +542,7 @@ def add_friend():
         friendship = Friendship(
             user_id=request.current_user.id,
             friend_id=friend.id,
-            status='pending'  # FIXED: Changed from 'accepted' to 'pending'
+            status='pending'  # Changed from 'accepted' to 'pending'
         )
         db.session.add(friendship)
         db.session.commit()
@@ -549,7 +558,7 @@ def add_friend():
 @app.route('/api/friends/requests', methods=['GET'])
 @login_required
 def get_friend_requests():
-    """ Get pending friend requests"""
+    """Get pending friend requests"""
     try:
         pending_requests = Friendship.query.filter_by(
             friend_id=request.current_user.id,
@@ -579,7 +588,7 @@ def get_friend_requests():
 @app.route('/api/friends/accept', methods=['POST'])
 @login_required
 def accept_friend_request():
-    """Accept a friend request"""
+    """ Accept a friend request"""
     try:
         data = request.get_json(force=True)
         request_id = data.get('request_id')
@@ -616,13 +625,15 @@ def accept_friend_request():
 @app.route('/api/friends/reject', methods=['POST'])
 @login_required
 def reject_friend_request():
-    """Reject a friend request after sending carter a friend request and it got auto-accepted (because that's how we did it first) he didnt know until I told him, and he had to refresh, but the person sendign therequest  knew because it showed me """
+    """Added after sending carter a friend request and it got auto-accepted (because that's how we did it first) he didnt know until I told him, and he had to refresh, but the person sendign therequest knew because it showed him"""
     try:
+
         data = request.get_json(force=True)
         request_id = data.get('request_id')
         
         if not request_id:
             return jsonify({'error': 'Request ID required'}), 400
+        
         friendship = Friendship.query.get(request_id)
         if not friendship:
             return jsonify({'error': 'Friend request not found'}), 404
@@ -713,8 +724,8 @@ def reconnect():
             try:
                 game_state_response['hand'] = json.loads(game_session.player_hand) if game_session.player_hand else []
                 game_state_response['current_trick'] = json.loads(game_session.current_trick) if game_session.current_trick else []
-                game_state_response['team_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
-                game_state_response['total_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else {'team_a': 0, 'team_b': 0}
+                game_state_response['round_scores'] = json.loads(game_session.team_scores) if game_session.team_scores else {'team_a': 0, 'team_b': 0}
+                game_state_response['team_scores'] = json.loads(game_session.total_scores) if game_session.total_scores else room.total_scores.copy()
                 game_state_response['current_player'] = game_session.current_player
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding game state: {e}")
@@ -776,7 +787,7 @@ def leave_room():
         with sessions_lock:
             del player_sessions[session_id]
         
-        # Broadcast with updated player list (After we tested, reconnection the room wouldnt update player count and couldn't rejoin because it was full )
+        # Broadcast with updated player list (After we tested, reconnection the room wouldnt update player count and couldn't 
         broadcast_event(room_id, 'player_left', {
             'player_name': player_name,
             'seat': seat,
@@ -809,7 +820,7 @@ def get_active_rooms():
 @app.route('/api/join', methods=['POST'])
 @login_required
 def join_room():
-    """Prevents duplicate joins from same account (While testing Yann joined same room twice with same account and browser)"""
+    """Prevents duplicate joins from same account (While testing Yann joined same room twice with same account and browser"""
     try:
         data = request.get_json(force=True)
         room_id = data.get('room_id')
@@ -861,8 +872,7 @@ def join_room():
             'seat': seat,
             'players': room.get_players_info()
         })
-        
-        # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button if he disconnects before starting the game, after Yann left by mistake when we were about to test)
+        # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button 
         can_ready = room.game_state in [GameState.WAITING, GameState.READY] and room.is_full()
         
         return jsonify({
@@ -913,6 +923,9 @@ def player_ready():
                 broadcast_event(room_id, 'game_started', {
                     'dealer': room.game.dealer,
                     'round_number': room.round_count,
+                    'total_scores': room.total_scores.copy(),  # Send current total scores
+                    'current_player': room.game.current_player,  # Who starts (dealer + 1)
+                    'current_player_name': room.players[room.game.current_player].name if room.players[room.game.current_player] else None,
                 })
                 
                 for s in range(4):
@@ -951,7 +964,6 @@ def send_chat_message():
         
         broadcast_event(room_id, 'chat_message', {
             'author': player_name,
-            
             'message': message,
             'timestamp': time.time()
         })
@@ -971,7 +983,6 @@ def poll_events():
         
         if not room_id:
             session_id = request.args.get('session_id')
-            
             with sessions_lock:
                 if session_id and session_id in player_sessions:
                     room_id = player_sessions[session_id]['room_id']
@@ -1065,7 +1076,8 @@ def play_card_enhanced():
                     'winner_seat': winner_seat,
                     'winner_name': winner_name,
                     'points': points,
-                    'team_scores': room.game.team_scores.copy(),
+                    'round_scores': room.game.team_scores.copy(),  # Round scores
+                    'team_scores': room.total_scores.copy(),  # Total cumulative scores
                     'trick_count': room.game.trick_count,
                     'next_leader': winner_seat,
                     'next_leader_name': winner_name,
@@ -1170,10 +1182,11 @@ def handle_round_end(room: Room, room_id: str) -> None:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
         broadcast_event(room_id, 'game_complete', {
             'game_winner': game_winner,
-            'final_total_scores': room.total_scores
+            'final_total_scores': room.total_scores.copy()  # Send final scores before reset
         })
-        room.game_state = GameState.FINISHED
         update_player_stats(room, game_winner)
+        # Reset everything for a new game
+        reset_game_after_win(room, room_id)
     else:
         start_new_round(room, room_id)
 
@@ -1211,7 +1224,7 @@ def update_player_stats(room: Room, game_winner: str) -> None:
 
 
 def start_new_round(room: Room, room_id: str) -> None:
-    """Prepare for next round"""
+    """Prepare for next round - does NOT reset total scores"""
     for p in room.players.values():
         if p:
             p.is_ready = False
@@ -1221,9 +1234,27 @@ def start_new_round(room: Room, room_id: str) -> None:
     
     broadcast_event(room_id, 'new_round_ready', {
         'round_number': room.round_count + 1,
-        'total_scores': room.total_scores,
+        'total_scores': room.total_scores,  # Send current totals
         'message': f'Round {room.round_count} complete! Ready up for Round {room.round_count + 1}!'
     })
+
+
+def reset_game_after_win(room: Room, room_id: str) -> None:
+    """Reset everything for a brand new game after someone won"""
+    room.total_scores = {'team_a': 0, 'team_b': 0}
+    room.round_count = 0
+    room.game_state = GameState.WAITING
+    room.game = None
+    
+    for p in room.players.values():
+        if p:
+            p.is_ready = False
+    
+    broadcast_event(room_id, 'game_reset', {
+        'message': 'Game complete! Ready up to start a new game.',
+        'total_scores': room.total_scores
+    })
+
 
 
 @app.errorhandler(404)

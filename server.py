@@ -326,7 +326,7 @@ def register():
         password = data.get('password') or ''
         
         if not username or len(username) < 3:
-        return jsonify({'error': 'Username must be at least 3 characters'}), 400
+            return jsonify({'error': 'Username must be at least 3 characters'}), 400
             
         if not email or '@' not in email:
             return jsonify({'error': 'Valid email required'}), 400
@@ -422,7 +422,6 @@ def logout():
 
 @app.route('/api/profile', methods=['GET'])
 @login_required
-
 def get_profile():
     return jsonify(request.current_user.to_dict()), 200
 
@@ -438,10 +437,9 @@ def update_profile():
             
         if 'bio' in data:
             user.bio = (data['bio'] or '')[:500]
-
-        
+            
         if 'avatar_url' in data:
-                user.avatar_url = (data['avatar_url'] or '')[:200]
+            user.avatar_url = (data['avatar_url'] or '')[:200]
         
         db.session.commit()
         return jsonify(user.to_dict()), 200
@@ -451,7 +449,6 @@ def update_profile():
         db.session.rollback()
         return jsonify({'error': 'Update failed'}), 500
 
-
 @app.route('/api/leaderboard', methods=['GET'])
 def get_leaderboard():
     top_players = User.query.order_by(
@@ -459,7 +456,6 @@ def get_leaderboard():
         User.win_rate.desc(),
         User.total_points.desc()
     ).limit(20).all()
-
     
     return jsonify([{
         'rank': i + 1,
@@ -468,7 +464,6 @@ def get_leaderboard():
         'level': p.level,
         'games_played': p.games_played,
         'games_won': p.games_won,
-        
         'win_rate': p.win_rate,
         'total_points': p.total_points,
     } for i, p in enumerate(top_players)]), 200
@@ -480,7 +475,6 @@ def get_friends():
     friendships = Friendship.query.filter(
         and_(
             or_(
-                
                 Friendship.user_id == request.current_user.id,
                 Friendship.friend_id == request.current_user.id
             ),
@@ -499,10 +493,8 @@ def get_friends():
         friends.append({
             'id': friend.id,
             'username': friend.username,
-            
             'display_name': friend.display_name or friend.username,
             'avatar_url': friend.avatar_url,
-            
             'level': friend.level,
             'online': is_online,
         })
@@ -627,7 +619,6 @@ def accept_friend_request():
 def reject_friend_request():
     """Added after sending carter a friend request and it got auto-accepted (because that's how we did it first) he didnt know until I told him, and he had to refresh, but the person sendign therequest knew because it showed him"""
     try:
-
         data = request.get_json(force=True)
         request_id = data.get('request_id')
         
@@ -787,7 +778,7 @@ def leave_room():
         with sessions_lock:
             del player_sessions[session_id]
         
-        # Broadcast with updated player list (After we tested, reconnection the room wouldnt update player count and couldn't 
+        # Broadcast with updated player list (After we tested, reconnection the room wouldnt update player count and couldn't rejoin because it was full)
         broadcast_event(room_id, 'player_left', {
             'player_name': player_name,
             'seat': seat,
@@ -820,7 +811,7 @@ def get_active_rooms():
 @app.route('/api/join', methods=['POST'])
 @login_required
 def join_room():
-    """Prevents duplicate joins from same account (While testing Yann joined same room twice with same account and browser"""
+    """Prevents duplicate joins from same account (While testing Yann joined same room twice with same account and browser)"""
     try:
         data = request.get_json(force=True)
         room_id = data.get('room_id')
@@ -872,7 +863,8 @@ def join_room():
             'seat': seat,
             'players': room.get_players_info()
         })
-        # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button 
+        
+        # Determine ifready button should be enabled (found an issue where the player leaving can't interact with the ready button if he disconnects before starting the game, after Yann left by mistake when we were about to test)
         can_ready = room.game_state in [GameState.WAITING, GameState.READY] and room.is_full()
         
         return jsonify({
@@ -1180,6 +1172,8 @@ def handle_round_end(room: Room, room_id: str) -> None:
     
     if room.total_scores['team_a'] >= 152 or room.total_scores['team_b'] >= 152:
         game_winner = 'Team A' if room.total_scores['team_a'] >= 152 else 'Team B'
+        room.game_state = GameState.FINISHED  # Mark game as finished before announcing
+        
         broadcast_event(room_id, 'game_complete', {
             'game_winner': game_winner,
             'final_total_scores': room.total_scores.copy()  # Send final scores before reset
@@ -1254,7 +1248,6 @@ def reset_game_after_win(room: Room, room_id: str) -> None:
         'message': 'Game complete! Ready up to start a new game.',
         'total_scores': room.total_scores
     })
-
 
 
 @app.errorhandler(404)
